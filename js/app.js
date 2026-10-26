@@ -2,11 +2,14 @@
 // Navigation par « hash » (#/favoris…) : fonctionne sans serveur
 // particulier, aussi bien en local que sur GitHub Pages.
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 // Chaque vue renvoie le HTML de la page correspondante.
 // Pour l'instant ce sont des pages d'attente : les fonctionnalités
 // arriveront étape par étape (voir la feuille de route du README).
+// Sécurité : ces gabarits ne contiennent que du texte écrit ici.
+// Les données des recettes ne doivent jamais y être insérées :
+// elles s'affichent avec textContent (voir CLAUDE.md).
 const vues = {
   "/": () => `
     <h2>Mes recettes</h2>
