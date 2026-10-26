@@ -13,9 +13,12 @@
   - le nombre de personnes ;
   - le chef ou l'auteur ;
   - la source : le livre d'origine ou le site internet.
-- **Mes meilleures recettes :** je marque d'une étoile les recettes que je considère comme les meilleures, pour les retrouver dans une liste de favoris.
-- **Recettes à essayer :** je marque les recettes que je n'ai encore jamais cuisinées. Elles forment une sorte de to-do list, et je les coche une fois réalisées.
-- **Classement :** chaque recette a une catégorie (entrée, plat, dessert…), une cuisine (française, japonaise…), une difficulté et des mots-clés libres (végétarien, rapide, hiver…).
+- **Statut de chaque recette :** sur l'écran d'une recette, je choisis où j'en suis :
+  - 📝 **À essayer** : jamais cuisinée. Ces recettes forment une to-do list dans l'onglet « À essayer » ;
+  - ✅ **Déjà cuisinée** : testée, correcte ;
+  - ⭐ **Favorite** : testée et adorée. Ces recettes sont dans l'onglet « Favoris » ;
+  - 👎 **À ne pas refaire** : testée, décevante, gardée pour mémoire.
+- **Classement :** chaque recette a une catégorie (entrée, plat, dessert…), une cuisine (française, japonaise…), une difficulté et des mots-clés libres (végétarien, rapide, hiver…), affichés sous forme de capsules.
 - **Partager une recette :** un bouton envoie la recette en texte (ingrédients, étapes, temps, source) par WhatsApp, SMS, e-mail… via le menu de partage du téléphone. Mes notes personnelles ne sont pas partagées.
 - **Liste de courses :** je sélectionne plusieurs recettes et l'application me donne une seule liste de courses qui regroupe tous les ingrédients nécessaires.
 - **En cuisine :**
@@ -52,7 +55,7 @@ GitHub (le dépôt `CuiCui-Recettes`) est la référence. Le téléphone en gard
   + file d'attente ◀─ synchro (API) ─                   ── git pull ──▶  depuis captures
 ```
 
-- **Envoi depuis le téléphone :** chaque modification (nouvelle recette, étoile, note…) est d'abord enregistrée sur le téléphone (IndexedDB), puis envoyée aussitôt à GitHub par l'API REST : GitHub crée lui-même le commit. Sans réseau, la modification attend dans une file d'attente et part automatiquement au retour de la connexion.
+- **Envoi depuis le téléphone :** chaque modification (nouvelle recette, changement de statut, note…) est d'abord enregistrée sur le téléphone (IndexedDB), puis envoyée aussitôt à GitHub par l'API REST : GitHub crée lui-même le commit. Sans réseau, la modification attend dans une file d'attente et part automatiquement au retour de la connexion.
 - **Réception sur le téléphone :** à chaque ouverture, à chaque retour sur l'application, ou avec le bouton **Synchroniser**, l'application compare l'empreinte (SHA) du dernier commit de `main` avec celle de la dernière synchronisation. Si elle a changé, elle récupère la liste des fichiers du dépôt avec leurs empreintes et ne télécharge que les recettes dont l'empreinte a changé. Les recettes supprimées sur GitHub disparaissent du téléphone.
 - **Ajout depuis le PC :** Claude récupère d'abord la dernière version du dépôt (`git pull`), crée les fiches, puis pousse sur `main`. Les recettes arrivent sur le téléphone à sa prochaine synchronisation.
 - **Conflits :** chaque envoi indique la version du fichier connue par le téléphone. Si le fichier a changé entre-temps, GitHub refuse (erreur 409). L'application fusionne alors les changements ou me demande de choisir. Rien n'est écrasé en silence.
@@ -133,9 +136,8 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [x] Partager une recette en texte (menu de partage du téléphone)
 - [ ] Afficher les photos d'une recette (page d'origine, photo du plat)
 - [ ] Ajouter et modifier une recette à la main
-- [ ] Marquer les meilleures recettes (favoris)
-- [ ] Marquer les recettes jamais cuisinées (à essayer)
-- [ ] Rechercher et filtrer les recettes (catégorie, cuisine, difficulté, mots-clés, favoris, à essayer)
+- [x] Choisir le statut d'une recette (à essayer, déjà cuisinée, favorite, à ne pas refaire) et afficher les onglets Favoris et À essayer
+- [ ] Rechercher et filtrer les recettes (catégorie, cuisine, difficulté, mots-clés, statut)
 - [ ] Ajuster les portions
 - [ ] Garder l'écran allumé en cuisine
 - [ ] Ajouter des notes personnelles

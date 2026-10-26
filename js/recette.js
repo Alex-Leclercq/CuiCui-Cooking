@@ -1,6 +1,33 @@
 // CuiCui Cooking – mise en forme d'une recette en texte lisible
 // (affichage et partage). Fonctions pures, sans accès à la page.
 
+// Statuts possibles d'une recette, dans l'ordre d'affichage.
+export const STATUTS = [
+  { valeur: "a-essayer", icone: "📝", libelle: "À essayer" },
+  { valeur: "cuisinee", icone: "✅", libelle: "Déjà cuisinée" },
+  { valeur: "favorite", icone: "⭐", libelle: "Favorite" },
+  { valeur: "a-eviter", icone: "👎", libelle: "À ne pas refaire" },
+];
+
+// Statut d'une recette. Comprend aussi l'ancien format (favori / aEssayer).
+export function lireStatut(recette) {
+  if (STATUTS.some((statut) => statut.valeur === recette.statut)) return recette.statut;
+  if (recette.favori === true) return "favorite";
+  if (recette.aEssayer === false) return "cuisinee";
+  return "a-essayer";
+}
+
+export const infosStatut = (valeur) => STATUTS.find((statut) => statut.valeur === valeur);
+
+// Nouvelle version de la recette avec ce statut ; les champs de l'ancien format disparaissent.
+export function avecStatut(recette, statut) {
+  const { favori, aEssayer, ...reste } = recette;
+  return { ...reste, statut };
+}
+
+// « française » → « Française » (affichage seulement : les fiches restent en minuscules).
+export const majuscule = (texte) => texte.charAt(0).toLocaleUpperCase("fr-FR") + texte.slice(1);
+
 // Unités qui prennent un « s » au pluriel (« 5 gousses d'ail »).
 const UNITES_VARIABLES = new Set(["pincée", "gousse", "tranche", "botte", "brin", "feuille", "boîte", "sachet"]);
 

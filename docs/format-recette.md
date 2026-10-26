@@ -51,10 +51,20 @@ Les photos sont compressées en JPEG avant d'être enregistrées, avec environ 1
 | `ingredients` | liste d'objets | oui | Voir ci-dessous. |
 | `etapes` | liste de textes | oui | Une entrée par étape, dans l'ordre. |
 | `notes` | texte | non | Mes remarques personnelles. |
-| `favori` | booléen | oui | `true` si c'est une de mes meilleures recettes. |
-| `aEssayer` | booléen | oui | `true` si je ne l'ai encore jamais cuisinée. |
+| `statut` | texte | oui | Où j'en suis avec cette recette (voir ci-dessous). `a-essayer` pour une nouvelle recette. |
 | `photos` | objet | non | `source` : liste des photos d'origine ; `plat` : photo du plat ou `null`. |
 | `dateAjout` | texte | oui | Date au format `AAAA-MM-JJ`. |
+
+### `statut`
+
+| Valeur | Affichage | Signification |
+|---|---|---|
+| `a-essayer` | 📝 À essayer | Jamais cuisinée. Apparaît dans l'onglet « À essayer ». |
+| `cuisinee` | ✅ Déjà cuisinée | Testée, correcte. |
+| `favorite` | ⭐ Favorite | Testée et adorée. Apparaît dans l'onglet « Favoris ». |
+| `a-eviter` | 👎 À ne pas refaire | Testée, décevante. |
+
+Ancien format : les fiches qui ont encore `favori` et `aEssayer` (booléens) sont comprises par l'application. Elles passent au champ `statut` dès que le statut est changé dans l'application.
 
 ### `source`
 

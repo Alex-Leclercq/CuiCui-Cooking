@@ -5,9 +5,12 @@
 import { ouvrirStockage } from "./stockage.js";
 import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
-import { formaterIngredient, formaterInfos, formaterSource, grouperIngredients, recetteEnTexte } from "./recette.js";
+import {
+  STATUTS, avecStatut, formaterIngredient, formaterInfos, formaterSource, grouperIngredients,
+  infosStatut, lireStatut, majuscule, recetteEnTexte,
+} from "./recette.js";
 
-const VERSION = "0.3.1";
+const VERSION = "0.4.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage();
@@ -70,6 +73,26 @@ function boutonSynchroniser() {
 // Chaque vue renvoie { contenu, rafraichir? }. « rafraichir » met à jour la vue
 // quand la synchronisation change quelque chose, sans tout reconstruire.
 
+// Liste de recettes triées par nom, chacune menant à son écran de détail.
+function listeRecettes(entrees) {
+  const nom = (entree) => String(entree.recette.nom ?? entree.id);
+  const triees = [...entrees].sort((a, b) => nom(a).localeCompare(nom(b), "fr"));
+  return [
+    el("p", { class: "discret" }, `${triees.length} recette(s)`),
+    el("ul", { class: "liste-recettes" }, triees.map((entree) => {
+      const { chef, source } = entree.recette;
+      const details = [chef, source?.titre].filter(Boolean).join(" · ");
+      const statut = infosStatut(lireStatut(entree.recette));
+      return el("li", {},
+        el("a", { class: "carte lien-recette", href: `#/recette/${encodeURIComponent(entree.id)}` },
+          el("span", { class: "lien-recette__titre" },
+            el("strong", {}, nom(entree)),
+            el("span", { class: "lien-recette__statut", title: statut.libelle, "aria-label": statut.libelle }, statut.icone)),
+          details && el("span", { class: "discret" }, details)));
+    })),
+  ];
+}
+
 async function vueRecettes() {
   const etat = el("p", { class: "discret" });
   const liste = el("div");
@@ -87,25 +110,26 @@ async function vueRecettes() {
           el("a", { href: "#/reglages", class: "bouton" }, "Aller aux Réglages")));
       return;
     }
-
-    const nom = (entree) => String(entree.recette.nom ?? entree.id);
-    entrees.sort((a, b) => nom(a).localeCompare(nom(b), "fr"));
-    liste.replaceChildren(
-      el("p", { class: "discret" }, `${entrees.length} recette(s)`),
-      el("ul", { class: "liste-recettes" }, entrees.map((entree) => {
-        const { chef, source } = entree.recette;
-        const details = [chef, source?.titre].filter(Boolean).join(" · ");
-        return el("li", {},
-          el("a", { class: "carte lien-recette", href: `#/recette/${encodeURIComponent(entree.id)}` },
-            el("strong", {}, nom(entree)),
-            details && el("span", { class: "discret" }, details)));
-      })));
+    liste.replaceChildren(...listeRecettes(entrees));
   }
 
   await rafraichir();
   return {
     contenu: page("Mes recettes", el("div", { class: "barre-actions" }, boutonSynchroniser()), etat, liste),
     rafraichir,
+  };
+}
+
+// Onglets « Favoris » et « À essayer » : les recettes d'un statut donné.
+function vueStatut(statut, titre, vide) {
+  return async () => {
+    const liste = el("div");
+    async function rafraichir() {
+      const entrees = (await stockage.lireRecettes()).filter((entree) => lireStatut(entree.recette) === statut);
+      liste.replaceChildren(...(entrees.length ? listeRecettes(entrees) : [vide()]));
+    }
+    await rafraichir();
+    return { contenu: page(titre, liste), rafraichir };
   };
 }
 
@@ -157,21 +181,35 @@ async function vueRecette(id) {
     };
   }
 
-  const { recette } = entree;
+  let { recette } = entree;
   const source = formaterSource(recette);
   const lienSource = lienWeb(recette.source?.url);
   const infos = formaterInfos(recette);
+  const categorie = recette.categorie && (CATEGORIES[recette.categorie] ?? majuscule(String(recette.categorie)));
   const etiquettes = [
-    recette.favori && "⭐ Favori",
-    recette.aEssayer && "📝 À essayer",
-    CATEGORIES[recette.categorie] ?? recette.categorie,
     recette.cuisine,
     recette.difficulte,
     ...(Array.isArray(recette.motsCles) ? recette.motsCles : []),
-  ].filter(Boolean);
+  ].filter(Boolean).map((etiquette) => majuscule(String(etiquette)));
+
+  // Choix du statut : un appui enregistre sur le téléphone puis envoie à GitHub.
+  const choixStatut = el("div", { class: "statuts", role: "radiogroup", "aria-label": "Statut de la recette" },
+    STATUTS.map((statut) => el("button", {
+      type: "button", class: "statut", role: "radio", "data-valeur": statut.valeur,
+      "aria-checked": String(statut.valeur === lireStatut(recette)),
+    }, `${statut.icone} ${statut.libelle}`)));
+  choixStatut.addEventListener("click", (evenement) => {
+    const bouton = evenement.target.closest(".statut");
+    if (!bouton || bouton.getAttribute("aria-checked") === "true") return;
+    for (const autre of choixStatut.querySelectorAll(".statut")) {
+      autre.setAttribute("aria-checked", String(autre === bouton));
+    }
+    recette = avecStatut(recette, bouton.dataset.valeur);
+    synchro.enregistrer(recette);
+  });
 
   const message = el("p", { class: "message", role: "status" });
-  const boutonPartager = el("button", { type: "button", class: "bouton" }, "📤 Partager");
+  const boutonPartager = el("button", { type: "button", class: "bouton bouton--secondaire" }, "📤 Partager");
   boutonPartager.addEventListener("click", () => partager(recette, message));
 
   return {
@@ -181,7 +219,10 @@ async function vueRecette(id) {
       source && el("p", { class: "discret" }, source),
       lienSource && el("p", {}, el("a", { href: lienSource, target: "_blank", rel: "noopener noreferrer" }, "Voir la recette en ligne")),
       infos && el("p", { class: "recette__infos" }, infos),
-      etiquettes.length > 0 && el("ul", { class: "etiquettes" }, etiquettes.map((etiquette) => el("li", {}, String(etiquette)))),
+      (categorie || etiquettes.length > 0) && el("ul", { class: "etiquettes" },
+        categorie && el("li", { class: "etiquette--categorie" }, categorie),
+        etiquettes.map((etiquette) => el("li", {}, etiquette))),
+      choixStatut,
       el("div", { class: "barre-actions" }, boutonPartager),
       message,
       el("h3", {}, "Ingrédients"),
@@ -289,15 +330,12 @@ async function vueReglages() {
 
 const vues = {
   "/": vueRecettes,
-  "/favoris": () => ({
-    contenu: page("Mes meilleures recettes",
-      pageVide("⭐", "Aucun favori pour l'instant.", "Marquez une recette d'une étoile pour la retrouver ici.")),
-  }),
-  "/a-essayer": () => ({
-    contenu: page("À essayer",
-      pageVide("📝", "Aucune recette à essayer.",
-        "Les recettes jamais cuisinées apparaîtront ici, comme une liste de choses à faire.")),
-  }),
+  "/favoris": vueStatut("favorite", "Mes meilleures recettes", () =>
+    pageVide("⭐", "Aucune favorite pour l'instant.",
+      "Sur l'écran d'une recette, choisissez « ⭐ Favorite » pour la retrouver ici.")),
+  "/a-essayer": vueStatut("a-essayer", "À essayer", () =>
+    pageVide("📝", "Aucune recette à essayer.",
+      "Les recettes jamais cuisinées apparaissent ici, comme une liste de choses à faire.")),
   "/courses": () => ({
     contenu: page("Liste de courses",
       pageVide("🛒", "Votre liste de courses est vide.",
