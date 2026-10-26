@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CuiCui Cooking</title>
+  <meta name="description" content="Mon carnet de recettes de poche.">
+  <meta name="theme-color" content="#c8553d">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icones/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icones/icone-192.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="entete">
+    <h1 class="entete__titre">🐦 CuiCui Cooking</h1>
+    <span id="etat-connexion" class="entete__etat" hidden>Hors ligne</span>
+  </header>
+
+  <main id="vue" class="vue" tabindex="-1"></main>
+
+  <nav class="navigation" aria-label="Navigation principale">
+    <a href="#/" data-route="/">
+      <span class="navigation__icone" aria-hidden="true">📖</span>Recettes
+    </a>
+    <a href="#/favoris" data-route="/favoris">
+      <span class="navigation__icone" aria-hidden="true">⭐</span>Favoris
+    </a>
+    <a href="#/a-essayer" data-route="/a-essayer">
+      <span class="navigation__icone" aria-hidden="true">📝</span>À essayer
+    </a>
+    <a href="#/courses" data-route="/courses">
+      <span class="navigation__icone" aria-hidden="true">🛒</span>Courses
+    </a>
+    <a href="#/reglages" data-route="/reglages">
+      <span class="navigation__icone" aria-hidden="true">⚙️</span>Réglages
+    </a>
+  </nav>
+
+  <script src="js/app.js" defer></script>
+</body>
+</html>
