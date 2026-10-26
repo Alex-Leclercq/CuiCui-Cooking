@@ -237,6 +237,40 @@ body {
   border-color: var(--accent);
 }
 
+.lien-recette__titre {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Choix du statut d'une recette */
+
+.statuts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.statut {
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--texte);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.statut[aria-checked="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-texte);
+  font-weight: 600;
+}
+
 /* Détail d'une recette */
 
 .retour {
@@ -284,6 +318,12 @@ body {
   border-radius: 999px;
   background: var(--surface);
   font-size: 0.85rem;
+}
+
+.etiquettes .etiquette--categorie {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .ingredients {

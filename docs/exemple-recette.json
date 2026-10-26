@@ -34,8 +34,7 @@
     "Enfourner 35 minutes, jusqu'à ce que la quiche soit dorée."
   ],
   "notes": "",
-  "favori": false,
-  "aEssayer": true,
+  "statut": "a-essayer",
   "photos": {
     "source": ["source-1.jpg"],
     "plat": null

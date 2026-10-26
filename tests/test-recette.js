@@ -2,7 +2,8 @@
 // Ouvrir tests/test-recette.html avec le serveur local.
 
 import {
-  formaterDuree, formaterIngredient, formaterInfos, formaterSource, grouperIngredients, recetteEnTexte,
+  avecStatut, formaterDuree, formaterIngredient, formaterInfos, formaterSource, grouperIngredients,
+  lireStatut, majuscule, recetteEnTexte,
 } from "../js/recette.js";
 
 function egal(obtenu, attendu) {
@@ -30,6 +31,30 @@ const exemple = {
 };
 
 const tests = {
+  "Statut : nouveau champ"() {
+    egal(lireStatut({ statut: "a-eviter" }), "a-eviter");
+    egal(lireStatut({ statut: "favorite" }), "favorite");
+  },
+
+  "Statut : ancien format favori / aEssayer"() {
+    egal(lireStatut({ favori: false, aEssayer: true }), "a-essayer");
+    egal(lireStatut({ favori: false, aEssayer: false }), "cuisinee");
+    egal(lireStatut({ favori: true, aEssayer: false }), "favorite");
+    egal(lireStatut({}), "a-essayer");
+    egal(lireStatut({ statut: "inconnu", favori: true }), "favorite");
+  },
+
+  "Statut : changer de statut supprime l'ancien format"() {
+    const nouvelle = avecStatut({ id: "a", nom: "A", favori: false, aEssayer: true }, "cuisinee");
+    egal(JSON.stringify(nouvelle), JSON.stringify({ id: "a", nom: "A", statut: "cuisinee" }));
+  },
+
+  "Majuscule à l'affichage"() {
+    egal(majuscule("française"), "Française");
+    egal(majuscule("éte"), "Éte");
+    egal(majuscule(""), "");
+  },
+
   "Durées"() {
     egal(formaterDuree(20), "20 min");
     egal(formaterDuree(80), "1 h 20");
