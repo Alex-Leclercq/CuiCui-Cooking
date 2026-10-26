@@ -2,7 +2,7 @@
 // Changer CACHE à chaque version pour que les téléphones récupèrent
 // les nouveaux fichiers.
 
-const CACHE = "cuicui-v0.4.0";
+const CACHE = "cuicui-v0.4.1";
 
 const FICHIERS_APPLICATION = [
   "./",
@@ -20,9 +20,11 @@ const FICHIERS_APPLICATION = [
 ];
 
 self.addEventListener("install", (evenement) => {
-  evenement.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(FICHIERS_APPLICATION))
-  );
+  // cache: "reload" : toujours télécharger les fichiers depuis le serveur. Sinon le navigateur
+  // peut resservir d'anciens fichiers depuis son propre cache (10 min sur GitHub Pages) et la
+  // nouvelle version contiendrait l'ancien code.
+  const requetes = FICHIERS_APPLICATION.map((fichier) => new Request(fichier, { cache: "reload" }));
+  evenement.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(requetes)));
   self.skipWaiting();
 });
 

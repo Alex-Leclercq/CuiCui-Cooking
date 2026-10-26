@@ -121,7 +121,7 @@ Les tests s'ouvrent dans le navigateur :
 2. Après une ou deux minutes, l'application est en ligne sur https://alex-leclercq.github.io/CuiCui-Cooking/
 3. Sur le téléphone Android, ouvrir cette adresse dans Chrome, puis menu **⋮ → Installer l'application** (ou **Ajouter à l'écran d'accueil**).
 
-Après chaque mise à jour de `main`, l'application se met à jour sur le téléphone à sa prochaine ouverture (parfois la suivante).
+Après chaque mise à jour de `main`, l'application cherche la nouvelle version à chaque ouverture et à chaque retour dessus. Elle se recharge d'elle-même si elle vient de s'ouvrir, sinon elle affiche un bandeau **Nouvelle version disponible → Mettre à jour**.
 
 Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessus), puis dans l'application **Réglages → Connexion à GitHub**, coller le jeton et appuyer sur **Enregistrer et tester**.
 
