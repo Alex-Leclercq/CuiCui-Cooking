@@ -11,11 +11,11 @@ function egal(obtenu, attendu) {
 
 const ingredient = (quantite, unite, nom, precision = null, groupe = null) => ({ quantite, unite, nom, precision, groupe });
 
-const gratin = {
-  id: "gratin-dauphinois-philippe-etchebest",
-  nom: "Gratin dauphinois",
-  chef: "Philippe Etchebest",
-  source: { type: "livre", titre: "Cuisinez bien accompagné avec ma méthode Mentor", url: null, page: 120 },
+const exemple = {
+  id: "recette-test-chef-test",
+  nom: "Recette test",
+  chef: "Chef Test",
+  source: { type: "livre", titre: "Livre test", url: null, page: 12 },
   portions: 6,
   tempsPreparation: 20,
   tempsCuisson: 80,
@@ -25,7 +25,7 @@ const gratin = {
     ingredient(5, "gousse", "ail"),
     ingredient(null, null, "gros sel"),
   ],
-  etapes: ["Beurrez un moule à gratin.", "Enfournez pour 1 h 15 environ."],
+  etapes: ["Première étape.", "Deuxième étape."],
   notes: "Note privée à ne pas partager",
 };
 
@@ -65,9 +65,9 @@ const tests = {
   },
 
   "Source et informations"() {
-    egal(formaterSource(gratin), "Philippe Etchebest · Cuisinez bien accompagné avec ma méthode Mentor, p. 120");
+    egal(formaterSource(exemple), "Chef Test · Livre test, p. 12");
     egal(formaterSource({ chef: null, source: { titre: "Marmiton" } }), "Marmiton");
-    egal(formaterInfos(gratin), "Pour 6 personnes · Préparation 20 min · Cuisson 1 h 20");
+    egal(formaterInfos(exemple), "Pour 6 personnes · Préparation 20 min · Cuisson 1 h 20");
   },
 
   "Ingrédients regroupés par sous-partie, dans l'ordre"() {
@@ -80,10 +80,10 @@ const tests = {
   },
 
   "Texte partagé complet, sans les notes personnelles"() {
-    const texte = recetteEnTexte(gratin);
+    const texte = recetteEnTexte(exemple);
     const attendu = [
-      "🍽️ Gratin dauphinois",
-      "Philippe Etchebest · Cuisinez bien accompagné avec ma méthode Mentor, p. 120",
+      "🍽️ Recette test",
+      "Chef Test · Livre test, p. 12",
       "",
       "Pour 6 personnes · Préparation 20 min · Cuisson 1 h 20",
       "",
@@ -93,8 +93,8 @@ const tests = {
       "• Gros sel",
       "",
       "PRÉPARATION",
-      "1. Beurrez un moule à gratin.",
-      "2. Enfournez pour 1 h 15 environ.",
+      "1. Première étape.",
+      "2. Deuxième étape.",
       "",
       "Partagé depuis CuiCui Cooking 🐦",
     ].join("\n");

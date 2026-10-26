@@ -39,7 +39,7 @@ export function formaterIngredient({ quantite, unite, nom = "", precision }) {
   return precision ? `${texte} (${precision})` : texte;
 }
 
-// « Philippe Etchebest · Mon livre, p. 120 »
+// « Chef · Titre du livre, p. 120 »
 export function formaterSource(recette) {
   const source = recette.source ?? {};
   const origine = [source.titre, source.page ? `p. ${source.page}` : null].filter(Boolean).join(", ");
