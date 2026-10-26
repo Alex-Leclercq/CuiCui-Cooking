@@ -1,0 +1,44 @@
+{
+  "id": "quiche-lorraine",
+  "nom": "Quiche lorraine",
+  "chef": "Exemple",
+  "source": {
+    "type": "livre",
+    "titre": "Mon livre de cuisine",
+    "url": null,
+    "page": 42
+  },
+  "categorie": "plat",
+  "cuisine": "française",
+  "difficulte": "facile",
+  "motsCles": ["tarte", "rapide"],
+  "portions": 6,
+  "tempsPreparation": 20,
+  "tempsCuisson": 35,
+  "tempsRepos": 0,
+  "ingredients": [
+    { "quantite": 1, "unite": null, "nom": "pâte brisée", "precision": null, "groupe": null },
+    { "quantite": 200, "unite": "g", "nom": "lardon", "precision": "fumés", "groupe": null },
+    { "quantite": 3, "unite": null, "nom": "œuf", "precision": null, "groupe": null },
+    { "quantite": 20, "unite": "cl", "nom": "crème fraîche", "precision": "épaisse", "groupe": null },
+    { "quantite": 20, "unite": "cl", "nom": "lait", "precision": null, "groupe": null },
+    { "quantite": 1, "unite": "pincée", "nom": "muscade", "precision": "râpée", "groupe": null },
+    { "quantite": null, "unite": null, "nom": "sel, poivre", "precision": null, "groupe": null }
+  ],
+  "etapes": [
+    "Préchauffer le four à 180 °C.",
+    "Foncer un moule à tarte avec la pâte et la piquer à la fourchette.",
+    "Faire revenir les lardons à sec dans une poêle, puis les égoutter.",
+    "Battre les œufs avec la crème, le lait, la muscade, le sel et le poivre.",
+    "Répartir les lardons sur la pâte et verser l'appareil.",
+    "Enfourner 35 minutes, jusqu'à ce que la quiche soit dorée."
+  ],
+  "notes": "",
+  "favori": false,
+  "aEssayer": true,
+  "photos": {
+    "source": ["source-1.jpg"],
+    "plat": null
+  },
+  "dateAjout": "2026-10-26"
+}
