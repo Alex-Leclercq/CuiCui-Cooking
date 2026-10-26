@@ -13,6 +13,8 @@
   - le nombre de personnes ;
   - le chef ou l'auteur ;
   - la source : le livre d'origine ou le site internet.
+- **Mes meilleures recettes :** je marque d'une étoile les recettes que je considère comme les meilleures, pour les retrouver dans une liste de favoris.
+- **Recettes à essayer :** je marque les recettes que je n'ai encore jamais cuisinées. Elles forment une sorte de to-do list, et je les coche une fois réalisées.
 
 ## Principes du projet
 
@@ -27,4 +29,6 @@
 - [ ] Afficher la liste des recettes et le détail d'une recette
 - [ ] Ajouter une recette à la main
 - [ ] Importer une recette à partir d'une photo
-- [ ] Rechercher et filtrer les recettes
+- [ ] Marquer les meilleures recettes (favoris)
+- [ ] Marquer les recettes jamais cuisinées (à essayer)
+- [ ] Rechercher et filtrer les recettes (dont favoris et à essayer)
