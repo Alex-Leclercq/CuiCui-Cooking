@@ -25,19 +25,60 @@
 ## Deux façons d'importer une recette
 
 1. **Depuis l'application (OCR) :** je photographie la page, l'application reconnaît le texte sur le téléphone et pré-remplit le formulaire. Je vérifie et corrige les champs avant d'enregistrer.
-2. **Via Claude :** j'envoie des captures d'écran de la recette à Claude, depuis mon PC ou mon téléphone. Claude extrait tous les champs, crée la fiche au [format défini](docs/format-recette.md) et la pousse dans ce dépôt.
+2. **Via Claude :** j'envoie des captures d'écran de la recette à Claude, depuis mon PC ou mon téléphone. Claude extrait tous les champs, crée la fiche au [format défini](docs/format-recette.md) et la pousse dans le dépôt des recettes.
 
 ## Choix techniques
 
 - **Téléphone visé :** Android.
-- **Application web installable (PWA) :** elle s'ajoute à l'écran d'accueil comme une vraie application, fonctionne hors ligne et est hébergée gratuitement sur GitHub Pages. Pas de store, pas de compilation.
-- **Sans base de données :** ce dépôt GitHub sert de stockage.
-  - Chaque recette a son propre dossier dans `recettes/`, avec un fichier `recette.json` et la ou les photos d'origine.
-  - L'application lit et écrit ces fichiers via l'API GitHub, avec un jeton personnel saisi une seule fois sur le téléphone.
-  - Les recettes sont gardées en mémoire sur le téléphone. À chaque ouverture, seules les recettes modifiées sont téléchargées.
+- **Application web installable (PWA) :** elle s'ajoute à l'écran d'accueil comme une vraie application et fonctionne hors ligne. Pas de store, pas de compilation.
 - **Léger :** HTML, CSS et JavaScript simples, sans framework lourd.
+- **Sans base de données :** GitHub sert de stockage, réparti sur deux dépôts.
+
+| Dépôt | Visibilité | Contenu |
+|---|---|---|
+| `CuiCui-Cooking` (celui-ci) | **Public** | Uniquement le code de l'application et sa documentation. Il est publié gratuitement sur GitHub Pages. Il ne contient aucune recette ni aucun secret. |
+| `CuiCui-Recettes` | **Privé** | Mes recettes : un dossier par recette dans `recettes/`, avec `recette.json` et les photos d'origine. |
 
 Le format d'une fiche recette est décrit dans [docs/format-recette.md](docs/format-recette.md).
+
+## Fonctionnement de la synchronisation
+
+GitHub (le dépôt `CuiCui-Recettes`) est la référence. Le téléphone en garde une copie pour fonctionner hors ligne.
+
+```
+  📱 Téléphone                    ☁️ CuiCui-Recettes (privé)            💻 PC + Claude
+  copie locale  ── envoi (API) ──▶      recettes/       ◀── git push ──  fiches créées
+  + file d'attente ◀─ synchro (API) ─                   ── git pull ──▶  depuis captures
+```
+
+- **Envoi depuis le téléphone :** chaque modification (nouvelle recette, étoile, note…) est d'abord enregistrée sur le téléphone (IndexedDB), puis envoyée aussitôt à GitHub par l'API REST : GitHub crée lui-même le commit. Sans réseau, la modification attend dans une file d'attente et part automatiquement au retour de la connexion.
+- **Réception sur le téléphone :** à chaque ouverture, ou avec le bouton **Synchroniser**, l'application compare l'empreinte (SHA) du dernier commit de `main` avec celle de la dernière synchronisation. Si elle a changé, elle demande à GitHub la liste des fichiers modifiés et ne télécharge que ceux-là.
+- **Ajout depuis le PC :** Claude récupère d'abord la dernière version du dépôt (`git pull`), crée les fiches, puis pousse sur `main`. Les recettes arrivent sur le téléphone à sa prochaine synchronisation.
+- **Conflits :** chaque envoi indique la version du fichier connue par le téléphone. Si le fichier a changé entre-temps, GitHub refuse (erreur 409). L'application fusionne alors les changements ou me demande de choisir. Rien n'est écrasé en silence.
+
+Tout cela est gratuit : l'API GitHub autorise 5 000 requêtes par heure, et une synchronisation n'en utilise que quelques-unes.
+
+## Sécurité
+
+L'application accède au dépôt privé avec un **jeton d'accès personnel**, saisi une seule fois dans les Réglages de l'application sur le téléphone.
+
+**Créer le jeton :** GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
+- **Repository access :** *Only select repositories* → `CuiCui-Recettes` uniquement.
+- **Permissions :** *Contents* → *Read and write*. Rien d'autre.
+- **Expiration :** une date limite, par exemple un an.
+
+Règles appliquées dans l'application :
+
+| Risque | Protection |
+|---|---|
+| Vol du jeton (téléphone perdu ou volé) | Jeton limité à un seul dépôt et aux seuls fichiers. Il est révocable à tout moment depuis GitHub. Téléphone verrouillé. |
+| Injection de code via le texte d'une recette (XSS) | Les données des recettes sont toujours affichées comme du texte, jamais interprétées comme du HTML. |
+| Envoi de données vers un autre site | Une politique de sécurité du contenu (CSP) n'autorise que les fichiers de l'application et les connexions vers `api.github.com`. |
+| Bibliothèque externe compromise (OCR…) | Les bibliothèques sont copiées dans ce dépôt, à une version figée. Aucune n'est chargée depuis un site tiers. |
+| Jeton publié par erreur | Le jeton n'est jamais écrit dans un fichier du projet. GitHub révoque automatiquement un jeton détecté dans un dépôt public. |
+| Recettes modifiées ou supprimées | L'historique Git permet de tout restaurer. Le clone du dépôt sur le PC sert de sauvegarde complète. |
+
+Recommandations pour le compte GitHub : activer la **double authentification (2FA)** et l'**adresse e-mail privée** pour les commits (Settings → Emails).
 
 ## Organisation du code
 
@@ -63,7 +104,7 @@ Puis ouvrir http://localhost:8080 dans le navigateur. `Ctrl+C` arrête le serveu
 
 ## Installer sur le téléphone
 
-1. Sur GitHub : **Settings → Pages**, source **Deploy from a branch**, branche `main`, dossier `/ (root)`, puis **Save**.
+1. Sur GitHub, dans ce dépôt (public) : **Settings → Pages**, source **Deploy from a branch**, branche `main`, dossier `/ (root)`, puis **Save**.
 2. Après une ou deux minutes, l'application est en ligne sur https://alex-leclercq.github.io/CuiCui-Cooking/
 3. Sur le téléphone Android, ouvrir cette adresse dans Chrome, puis menu **⋮ → Installer l'application** (ou **Ajouter à l'écran d'accueil**).
 
@@ -74,7 +115,8 @@ Après chaque mise à jour de `main`, l'application se met à jour sur le télé
 - [x] Choisir la technologie
 - [x] Définir le format d'une fiche recette
 - [x] Créer le squelette de l'application (PWA installable, hors ligne, GitHub Pages)
-- [ ] Connecter l'application au dépôt GitHub (lecture et écriture des recettes)
+- [x] Choisir l'hébergement (code public sur GitHub Pages, recettes dans un dépôt privé)
+- [ ] Connecter l'application au dépôt des recettes (jeton, lecture, écriture, synchronisation)
 - [ ] Afficher la liste des recettes et le détail d'une recette
 - [ ] Ajouter et modifier une recette à la main
 - [ ] Marquer les meilleures recettes (favoris)

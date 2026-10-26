@@ -1,6 +1,6 @@
 # Format d'une fiche recette
 
-Chaque recette a son propre dossier dans `recettes/`. Le nom du dossier est l'identifiant unique de la recette.
+Les recettes sont stockées dans le dépôt **privé** `CuiCui-Recettes`, pas dans ce dépôt public. Chaque recette a son propre dossier dans `recettes/`. Le nom du dossier est l'identifiant unique de la recette.
 
 ## Choix de l'identifiant
 
