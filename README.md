@@ -52,7 +52,7 @@ GitHub (le dépôt `CuiCui-Recettes`) est la référence. Le téléphone en gard
 ```
 
 - **Envoi depuis le téléphone :** chaque modification (nouvelle recette, étoile, note…) est d'abord enregistrée sur le téléphone (IndexedDB), puis envoyée aussitôt à GitHub par l'API REST : GitHub crée lui-même le commit. Sans réseau, la modification attend dans une file d'attente et part automatiquement au retour de la connexion.
-- **Réception sur le téléphone :** à chaque ouverture, ou avec le bouton **Synchroniser**, l'application compare l'empreinte (SHA) du dernier commit de `main` avec celle de la dernière synchronisation. Si elle a changé, elle demande à GitHub la liste des fichiers modifiés et ne télécharge que ceux-là.
+- **Réception sur le téléphone :** à chaque ouverture, à chaque retour sur l'application, ou avec le bouton **Synchroniser**, l'application compare l'empreinte (SHA) du dernier commit de `main` avec celle de la dernière synchronisation. Si elle a changé, elle récupère la liste des fichiers du dépôt avec leurs empreintes et ne télécharge que les recettes dont l'empreinte a changé. Les recettes supprimées sur GitHub disparaissent du téléphone.
 - **Ajout depuis le PC :** Claude récupère d'abord la dernière version du dépôt (`git pull`), crée les fiches, puis pousse sur `main`. Les recettes arrivent sur le téléphone à sa prochaine synchronisation.
 - **Conflits :** chaque envoi indique la version du fichier connue par le téléphone. Si le fichier a changé entre-temps, GitHub refuse (erreur 409). L'application fusionne alors les changements ou me demande de choisir. Rien n'est écrasé en silence.
 
@@ -86,7 +86,11 @@ Recommandations pour le compte GitHub : activer la **double authentification (2F
 |---|---|
 | `index.html` | La page de l'application : en-tête, zone de contenu, barre de navigation. |
 | `css/app.css` | L'apparence, avec un thème clair et un thème sombre automatiques. |
-| `js/app.js` | La logique : navigation entre les pages et affichage. |
+| `js/app.js` | L'interface : navigation entre les pages et affichage. |
+| `js/stockage.js` | Le stockage local sur le téléphone (IndexedDB) : copie des recettes, file d'attente, réglages. |
+| `js/github.js` | Les échanges avec l'API GitHub (lecture et écriture des fichiers). |
+| `js/synchro.js` | La synchronisation : envoi, réception, fusion et conflits. |
+| `tests/` | Les tests de la synchronisation, avec un faux GitHub en mémoire. |
 | `sw.js` | Le « service worker » qui garde l'application en mémoire pour l'utiliser hors ligne. |
 | `manifest.webmanifest` | La carte d'identité de l'application (nom, icône, couleurs), qui permet de l'installer sur le téléphone. |
 | `icones/` | Les icônes de l'application. |
@@ -102,6 +106,8 @@ powershell -ExecutionPolicy Bypass -File outils\serveur-local.ps1
 
 Puis ouvrir http://localhost:8080 dans le navigateur. `Ctrl+C` arrête le serveur.
 
+Les tests de la synchronisation s'ouvrent sur http://localhost:8080/tests/test-synchro.html. Ils utilisent un faux GitHub en mémoire : aucun appel réseau, aucun jeton.
+
 ## Installer sur le téléphone
 
 1. Sur GitHub, dans ce dépôt (public) : **Settings → Pages**, source **Deploy from a branch**, branche `main`, dossier `/ (root)`, puis **Save**.
@@ -110,13 +116,15 @@ Puis ouvrir http://localhost:8080 dans le navigateur. `Ctrl+C` arrête le serveu
 
 Après chaque mise à jour de `main`, l'application se met à jour sur le téléphone à sa prochaine ouverture (parfois la suivante).
 
+Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessus), puis dans l'application **Réglages → Connexion à GitHub**, coller le jeton et appuyer sur **Enregistrer et tester**.
+
 ## Feuille de route
 
 - [x] Choisir la technologie
 - [x] Définir le format d'une fiche recette
 - [x] Créer le squelette de l'application (PWA installable, hors ligne, GitHub Pages)
 - [x] Choisir l'hébergement (code public sur GitHub Pages, recettes dans un dépôt privé)
-- [ ] Connecter l'application au dépôt des recettes (jeton, lecture, écriture, synchronisation)
+- [x] Connecter l'application au dépôt des recettes (jeton, lecture, écriture, synchronisation)
 - [ ] Afficher la liste des recettes et le détail d'une recette
 - [ ] Ajouter et modifier une recette à la main
 - [ ] Marquer les meilleures recettes (favoris)

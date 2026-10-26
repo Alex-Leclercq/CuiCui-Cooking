@@ -30,6 +30,11 @@
   box-sizing: border-box;
 }
 
+/* Un élément masqué reste masqué, quel que soit son style d'affichage. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -63,6 +68,11 @@ body {
   margin: 0;
   font-size: 1.2rem;
   font-weight: 700;
+}
+
+.entete__badges {
+  display: flex;
+  gap: 6px;
 }
 
 .entete__etat {
@@ -118,6 +128,112 @@ body {
 .discret {
   color: var(--texte-doux);
   font-size: 0.9rem;
+}
+
+/* Boutons */
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-texte);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.bouton--secondaire {
+  background: transparent;
+  color: var(--accent);
+}
+
+.bouton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.barre-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+/* Formulaires */
+
+.formulaire .champ {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.formulaire .champ span {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.formulaire input {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  background: var(--fond);
+  color: var(--texte);
+  font: inherit;
+}
+
+.formulaire input:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.message:empty {
+  display: none;
+}
+
+.message--succes {
+  color: #2e7d4f;
+}
+
+.message--erreur {
+  color: #c0392b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .message--succes {
+    color: #6fcf97;
+  }
+
+  .message--erreur {
+    color: #ff8a80;
+  }
+}
+
+/* Liste des recettes */
+
+.liste-recettes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.liste-recettes li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conflit {
+  padding: 12px 0;
+  border-top: 1px solid var(--bordure);
 }
 
 /* Barre de navigation du bas */

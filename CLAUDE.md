@@ -32,4 +32,6 @@ Application web installable (PWA) de recettes de cuisine, pour un téléphone An
 - **À chaque modification d'un fichier de l'application**, incrémenter `CACHE` dans `sw.js` et `VERSION` dans `js/app.js`. Sinon les téléphones gardent l'ancienne version en cache.
 - Tout nouveau fichier de l'application doit être ajouté à `FICHIERS_APPLICATION` dans `sw.js`.
 - Chemins toujours relatifs (`css/app.css`, pas `/css/app.css`) : le site est servi sous `/CuiCui-Cooking/`.
+- Toute modification de `js/synchro.js`, `js/github.js` ou `js/stockage.js` doit garder les tests `tests/test-synchro.html` au vert ; ajouter un test pour chaque nouveau cas.
+- Pour afficher du contenu, utiliser la fonction `el()` de `js/app.js` : elle ne crée que des nœuds texte.
 - Tester avec le serveur local (`outils/serveur-local.ps1`, http://localhost:8080), en affichage mobile, mode sombre compris. Le mode hors ligne ne fonctionne pas en ouvrant `index.html` directement.
