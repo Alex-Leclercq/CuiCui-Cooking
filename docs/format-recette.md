@@ -1,10 +1,30 @@
 # Format d'une fiche recette
 
-Chaque recette a son propre dossier dans `recettes/`. Le nom du dossier est l'identifiant de la recette : son nom en minuscules, sans accents, avec des tirets à la place des espaces (par exemple `boeuf-bourguignon`).
+Chaque recette a son propre dossier dans `recettes/`. Le nom du dossier est l'identifiant unique de la recette.
+
+## Choix de l'identifiant
+
+Plusieurs recettes peuvent porter le même nom, par exemple plusieurs bœufs bourguignons tirés de livres différents. L'identifiant est donc construit ainsi :
+
+1. le nom de la recette, suivi du chef (ou, sans chef, du titre de la source) ;
+2. le tout en minuscules, sans accents, avec des tirets à la place des espaces et de la ponctuation ;
+3. si cet identifiant existe déjà, on ajoute `-2`, `-3`, etc.
+
+| Recette | Chef / source | Identifiant |
+|---|---|---|
+| Bœuf bourguignon | Paul Bocuse | `boeuf-bourguignon-paul-bocuse` |
+| Bœuf bourguignon | Cyril Lignac | `boeuf-bourguignon-cyril-lignac` |
+| Bœuf bourguignon | sans chef, site Marmiton | `boeuf-bourguignon-marmiton` |
+| Bœuf bourguignon | Paul Bocuse, deuxième version | `boeuf-bourguignon-paul-bocuse-2` |
+| Bœuf bourguignon | ni chef ni source | `boeuf-bourguignon` |
+
+L'identifiant ne change plus après la création, même si je renomme la recette ou corrige le chef. Il sert uniquement à ranger les fichiers. Dans l'application, c'est toujours le nom, le chef et la source qui sont affichés.
+
+## Organisation des fichiers
 
 ```
 recettes/
-  boeuf-bourguignon/
+  boeuf-bourguignon-paul-bocuse/
     recette.json      ← la fiche recette
     source-1.jpg      ← photo(s) d'origine : page de livre, capture d'écran
     plat.jpg          ← photo du plat (facultative)
@@ -16,7 +36,7 @@ Les photos sont compressées en JPEG avant d'être enregistrées, avec environ 1
 
 | Champ | Type | Obligatoire | Description |
 |---|---|---|---|
-| `id` | texte | oui | Identique au nom du dossier. |
+| `id` | texte | oui | Identique au nom du dossier (voir « Choix de l'identifiant »). |
 | `nom` | texte | oui | Nom de la recette. |
 | `chef` | texte | non | Chef ou auteur. |
 | `source` | objet | non | D'où vient la recette (voir ci-dessous). |
