@@ -83,9 +83,13 @@ const tests = {
     const texte = recetteEnTexte(exemple);
     const attendu = [
       "🍽️ Recette test",
-      "Chef Test · Livre test, p. 12",
       "",
-      "Pour 6 personnes · Préparation 20 min · Cuisson 1 h 20",
+      "Chef Test",
+      "Livre test, p. 12",
+      "",
+      "Pour 6 personnes",
+      "Préparation : 20 min",
+      "Cuisson : 1 h 20",
       "",
       "INGRÉDIENTS",
       "• 10 g de beurre",
@@ -99,6 +103,11 @@ const tests = {
       "Partagé depuis CuiCui Cooking 🐦",
     ].join("\n");
     egal(texte, attendu);
+  },
+
+  "Texte partagé : sans chef ni temps, pas de lignes vides en trop"() {
+    const texte = recetteEnTexte({ nom: "Soupe", source: { titre: "Marmiton" }, tempsRepos: 30, ingredients: [], etapes: [] });
+    egal(texte.split("\n").slice(0, 5).join("|"), "🍽️ Soupe||Marmiton||Repos : 30 min");
   },
 
   "Texte partagé : lien de la source web inclus"() {

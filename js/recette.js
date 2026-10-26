@@ -68,13 +68,23 @@ export function grouperIngredients(ingredients = []) {
 }
 
 // Texte complet envoyé par le bouton Partager (WhatsApp, SMS, e-mail…).
+// Une information par ligne : chef, puis livre ; portions, puis chaque temps.
 // Les notes personnelles ne sont pas partagées.
 export function recetteEnTexte(recette) {
   const lignes = [`🍽️ ${recette.nom ?? recette.id}`];
-  const source = formaterSource(recette);
-  if (source) lignes.push(source);
-  const infos = formaterInfos(recette);
-  if (infos) lignes.push("", infos);
+
+  const source = recette.source ?? {};
+  const origine = [source.titre, source.page ? `p. ${source.page}` : null].filter(Boolean).join(", ");
+  const lignesSource = [recette.chef, origine].filter(Boolean);
+  if (lignesSource.length) lignes.push("", ...lignesSource);
+
+  const lignesInfos = [
+    recette.portions ? `Pour ${recette.portions} personne${recette.portions > 1 ? "s" : ""}` : null,
+    formaterDuree(recette.tempsPreparation) && `Préparation : ${formaterDuree(recette.tempsPreparation)}`,
+    formaterDuree(recette.tempsCuisson) && `Cuisson : ${formaterDuree(recette.tempsCuisson)}`,
+    formaterDuree(recette.tempsRepos) && `Repos : ${formaterDuree(recette.tempsRepos)}`,
+  ].filter(Boolean);
+  if (lignesInfos.length) lignes.push("", ...lignesInfos);
 
   lignes.push("", "INGRÉDIENTS");
   for (const groupe of grouperIngredients(recette.ingredients)) {
