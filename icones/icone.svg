@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#c8553d"/>
+  <!-- corps et tête de l'oiseau -->
+  <ellipse cx="240" cy="300" rx="130" ry="105" fill="#fbf7f2"/>
+  <circle cx="320" cy="200" r="72" fill="#fbf7f2"/>
+  <!-- aile -->
+  <ellipse cx="210" cy="300" rx="70" ry="45" fill="#f2c9a0"/>
+  <!-- bec -->
+  <polygon points="385,190 440,210 385,228" fill="#f2a541"/>
+  <!-- œil -->
+  <circle cx="338" cy="190" r="12" fill="#2b2420"/>
+</svg>
