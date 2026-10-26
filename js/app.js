@@ -7,7 +7,7 @@ import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
 import { formaterIngredient, formaterInfos, formaterSource, grouperIngredients, recetteEnTexte } from "./recette.js";
 
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage();
