@@ -16,15 +16,15 @@
 - **Statut de chaque recette :** sur l'écran d'une recette, je choisis où j'en suis :
   - 📝 **À essayer** : jamais cuisinée. Ces recettes forment une to-do list dans l'onglet « À essayer » ;
   - ✅ **Déjà cuisinée** : testée, correcte ;
-  - ⭐ **Favorite** : testée et adorée. Ces recettes sont dans l'onglet « Favoris » ;
-  - 👎 **À ne pas refaire** : testée, décevante, gardée pour mémoire.
+  - ⭐ **Favorite** : testée et adorée. Ces recettes sont dans l'onglet « Favoris ».
+- **Mes notes :** sur l'écran d'une recette, j'écris mes remarques et je les enregistre.
+- **Historique des modifications :** chaque changement de statut ou de notes est noté dans la fiche (date, avant → après). En cas de mauvaise manipulation, un bouton **↩ Revenir** restaure la valeur précédente.
 - **Classement :** chaque recette a une catégorie (entrée, plat, dessert…), une cuisine (française, japonaise…), une difficulté et des mots-clés libres (végétarien, rapide, hiver…), affichés sous forme de capsules.
 - **Partager une recette :** un bouton envoie la recette en texte (ingrédients, étapes, temps, source) par WhatsApp, SMS, e-mail… via le menu de partage du téléphone. Mes notes personnelles ne sont pas partagées.
 - **Liste de courses :** je sélectionne plusieurs recettes et l'application me donne une seule liste de courses qui regroupe tous les ingrédients nécessaires.
 - **En cuisine :**
   - j'ajuste le nombre de portions et les quantités sont recalculées ;
-  - l'écran reste allumé pendant que je cuisine ;
-  - j'ajoute mes notes personnelles (« moins de sucre », « 5 minutes de cuisson en plus »…).
+  - l'écran reste allumé pendant que je cuisine.
 
 ## Deux façons d'importer une recette
 
@@ -136,11 +136,12 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [x] Partager une recette en texte (menu de partage du téléphone)
 - [ ] Afficher les photos d'une recette (page d'origine, photo du plat)
 - [ ] Ajouter et modifier une recette à la main
-- [x] Choisir le statut d'une recette (à essayer, déjà cuisinée, favorite, à ne pas refaire) et afficher les onglets Favoris et À essayer
+- [x] Choisir le statut d'une recette (à essayer, déjà cuisinée, favorite) et afficher les onglets Favoris et À essayer
+- [x] Historique des modifications de statut et de notes, avec retour en arrière
 - [ ] Rechercher et filtrer les recettes (catégorie, cuisine, difficulté, mots-clés, statut)
 - [ ] Ajuster les portions
 - [ ] Garder l'écran allumé en cuisine
-- [ ] Ajouter des notes personnelles
+- [x] Ajouter des notes personnelles
 - [ ] Générer une liste de courses à partir de plusieurs recettes
 - [ ] Importer une recette à partir d'une photo (OCR)
 - [ ] Importer des recettes via Claude à partir de captures d'écran

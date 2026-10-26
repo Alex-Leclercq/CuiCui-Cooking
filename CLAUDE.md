@@ -35,4 +35,5 @@ Application web installable (PWA) de recettes de cuisine, pour un téléphone An
 - Chemins toujours relatifs (`css/app.css`, pas `/css/app.css`) : le site est servi sous `/CuiCui-Cooking/`.
 - Toute modification de `js/synchro.js`, `js/github.js` ou `js/stockage.js` doit garder les tests `tests/test-synchro.html` au vert ; ajouter un test pour chaque nouveau cas.
 - Pour afficher du contenu, utiliser la fonction `el()` de `js/app.js` : elle ne crée que des nœuds texte.
+- Toute modification du statut ou des notes d'une recette passe par `modifier()` de `js/recette.js`, qui ajoute la ligne d'historique. Ne jamais modifier ces champs directement.
 - Tester avec le serveur local (`outils/serveur-local.ps1`, http://localhost:8080), en affichage mobile, mode sombre compris. Le mode hors ligne ne fonctionne pas en ouvrant `index.html` directement.

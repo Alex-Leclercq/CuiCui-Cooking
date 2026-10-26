@@ -2,8 +2,8 @@
 // Ouvrir tests/test-recette.html avec le serveur local.
 
 import {
-  avecStatut, formaterDuree, formaterIngredient, formaterInfos, formaterSource, grouperIngredients,
-  lireStatut, majuscule, recetteEnTexte,
+  formaterDuree, formaterIngredient, formaterInfos, formaterModification, formaterSource, grouperIngredients,
+  lireStatut, majuscule, modifier, recetteEnTexte,
 } from "../js/recette.js";
 
 function egal(obtenu, attendu) {
@@ -32,8 +32,12 @@ const exemple = {
 
 const tests = {
   "Statut : nouveau champ"() {
-    egal(lireStatut({ statut: "a-eviter" }), "a-eviter");
     egal(lireStatut({ statut: "favorite" }), "favorite");
+    egal(lireStatut({ statut: "cuisinee" }), "cuisinee");
+  },
+
+  "Statut : « à ne pas refaire » (retiré) lu comme « déjà cuisinée »"() {
+    egal(lireStatut({ statut: "a-eviter" }), "cuisinee");
   },
 
   "Statut : ancien format favori / aEssayer"() {
@@ -44,9 +48,38 @@ const tests = {
     egal(lireStatut({ statut: "inconnu", favori: true }), "favorite");
   },
 
-  "Statut : changer de statut supprime l'ancien format"() {
-    const nouvelle = avecStatut({ id: "a", nom: "A", favori: false, aEssayer: true }, "cuisinee");
-    egal(JSON.stringify(nouvelle), JSON.stringify({ id: "a", nom: "A", statut: "cuisinee" }));
+  "Historique : changer de statut ajoute une ligne et supprime l'ancien format"() {
+    const date = new Date("2026-10-27T09:12:00.000Z");
+    const nouvelle = modifier({ id: "a", nom: "A", favori: false, aEssayer: true }, "statut", "favorite", date);
+    egal(JSON.stringify(nouvelle), JSON.stringify({
+      id: "a", nom: "A", statut: "favorite",
+      historique: [{ date: "2026-10-27T09:12:00.000Z", champ: "statut", avant: "a-essayer", apres: "favorite" }],
+    }));
+  },
+
+  "Historique : aucune ligne si la valeur ne change pas"() {
+    const recette = { id: "a", statut: "favorite", notes: "Bon" };
+    egal(modifier(recette, "statut", "favorite"), recette);
+    egal(modifier(recette, "notes", "Bon"), recette);
+  },
+
+  "Historique : notes ajoutées, modifiées, puis retour en arrière"() {
+    let recette = { id: "a", statut: "a-essayer" };
+    recette = modifier(recette, "notes", "Moins de sucre");
+    recette = modifier(recette, "notes", "Moins de sucre, plus de beurre");
+    const ligne = recette.historique[1];
+    egal(ligne.avant, "Moins de sucre");
+    recette = modifier(recette, ligne.champ, ligne.avant); // bouton « Revenir »
+    egal(recette.notes, "Moins de sucre");
+    egal(recette.historique.length, 3);
+  },
+
+  "Historique : textes affichés"() {
+    egal(formaterModification({ champ: "statut", avant: "favorite", apres: "a-essayer" }), "Statut : Favorite → À essayer");
+    egal(formaterModification({ champ: "statut", avant: "a-eviter", apres: "favorite" }), "Statut : Déjà cuisinée → Favorite");
+    egal(formaterModification({ champ: "notes", avant: "", apres: "Moins de sucre" }), "Notes ajoutées : « Moins de sucre »");
+    egal(formaterModification({ champ: "notes", avant: "Moins de sucre", apres: "" }), "Notes supprimées (c'était : « Moins de sucre »)");
+    egal(formaterModification({ champ: "notes", avant: "A", apres: "B" }), "Notes modifiées (avant : « A »)");
   },
 
   "Majuscule à l'affichage"() {

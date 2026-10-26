@@ -6,12 +6,13 @@ export const STATUTS = [
   { valeur: "a-essayer", icone: "📝", libelle: "À essayer" },
   { valeur: "cuisinee", icone: "✅", libelle: "Déjà cuisinée" },
   { valeur: "favorite", icone: "⭐", libelle: "Favorite" },
-  { valeur: "a-eviter", icone: "👎", libelle: "À ne pas refaire" },
 ];
 
-// Statut d'une recette. Comprend aussi l'ancien format (favori / aEssayer).
+// Statut d'une recette. Comprend aussi les anciens formats :
+// favori / aEssayer, et « a-eviter » (statut retiré, lu comme « déjà cuisinée »).
 export function lireStatut(recette) {
   if (STATUTS.some((statut) => statut.valeur === recette.statut)) return recette.statut;
+  if (recette.statut === "a-eviter") return "cuisinee";
   if (recette.favori === true) return "favorite";
   if (recette.aEssayer === false) return "cuisinee";
   return "a-essayer";
@@ -19,14 +20,52 @@ export function lireStatut(recette) {
 
 export const infosStatut = (valeur) => STATUTS.find((statut) => statut.valeur === valeur);
 
-// Nouvelle version de la recette avec ce statut ; les champs de l'ancien format disparaissent.
-export function avecStatut(recette, statut) {
+// Valeur actuelle d'un champ suivi par l'historique.
+function valeurSuivie(recette, champ) {
+  if (champ === "statut") return lireStatut(recette);
+  if (champ === "notes") return recette.notes ?? "";
+  return recette[champ];
+}
+
+// Nouvelle version de la recette avec un champ modifié (« statut » ou « notes »),
+// et une ligne ajoutée à son historique. Renvoie la même recette si rien ne change.
+// Les champs de l'ancien format (favori / aEssayer) disparaissent au passage.
+export function modifier(recette, champ, valeur, date = new Date()) {
+  const avant = valeurSuivie(recette, champ);
+  if (avant === valeur) return recette;
   const { favori, aEssayer, ...reste } = recette;
-  return { ...reste, statut };
+  return {
+    ...reste,
+    [champ]: valeur,
+    historique: [...(Array.isArray(recette.historique) ? recette.historique : []),
+      { date: date.toISOString(), champ, avant, apres: valeur }],
+  };
+}
+
+// Valeur actuelle du champ concerné par une ligne d'historique (pour savoir si « Revenir » a un sens).
+export const valeurActuelle = valeurSuivie;
+
+const extrait = (texte, longueur = 60) =>
+  (texte.length > longueur ? `${texte.slice(0, longueur).trimEnd()}…` : texte);
+
+// Une ligne d'historique en texte : « Statut : Favorite → À essayer ».
+export function formaterModification({ champ, avant, apres }) {
+  if (champ === "statut") {
+    const libelle = (valeur) => infosStatut(lireStatut({ statut: valeur }))?.libelle ?? valeur;
+    return `Statut : ${libelle(avant)} → ${libelle(apres)}`;
+  }
+  if (champ === "notes") {
+    if (!avant) return `Notes ajoutées : « ${extrait(apres)} »`;
+    if (!apres) return `Notes supprimées (c'était : « ${extrait(avant)} »)`;
+    return `Notes modifiées (avant : « ${extrait(avant)} »)`;
+  }
+  return `${majuscule(champ)} modifié`;
 }
 
 // « française » → « Française » (affichage seulement : les fiches restent en minuscules).
-export const majuscule = (texte) => texte.charAt(0).toLocaleUpperCase("fr-FR") + texte.slice(1);
+export function majuscule(texte) {
+  return texte.charAt(0).toLocaleUpperCase("fr-FR") + texte.slice(1);
+}
 
 // Unités qui prennent un « s » au pluriel (« 5 gousses d'ail »).
 const UNITES_VARIABLES = new Set(["pincée", "gousse", "tranche", "botte", "brin", "feuille", "boîte", "sachet"]);
