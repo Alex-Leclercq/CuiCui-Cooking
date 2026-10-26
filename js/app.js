@@ -6,11 +6,11 @@ import { ouvrirStockage } from "./stockage.js";
 import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
 import {
-  STATUTS, avecStatut, formaterIngredient, formaterInfos, formaterSource, grouperIngredients,
-  infosStatut, lireStatut, majuscule, recetteEnTexte,
+  STATUTS, formaterIngredient, formaterInfos, formaterModification, formaterSource, grouperIngredients,
+  infosStatut, lireStatut, majuscule, modifier, recetteEnTexte, valeurActuelle,
 } from "./recette.js";
 
-const VERSION = "0.4.1";
+const VERSION = "0.5.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage();
@@ -192,21 +192,72 @@ async function vueRecette(id) {
     ...(Array.isArray(recette.motsCles) ? recette.motsCles : []),
   ].filter(Boolean).map((etiquette) => majuscule(String(etiquette)));
 
-  // Choix du statut : un appui enregistre sur le téléphone puis envoie à GitHub.
+  // Toute modification (statut, notes, retour en arrière) passe par ici : nouvelle ligne
+  // d'historique, enregistrement sur le téléphone, envoi à GitHub, mise à jour de l'écran.
+  function appliquer(champ, valeur) {
+    const nouvelle = modifier(recette, champ, valeur);
+    if (nouvelle === recette) return false;
+    recette = nouvelle;
+    synchro.enregistrer(recette);
+    afficherStatut();
+    champNotes.value = recette.notes ?? "";
+    afficherHistorique();
+    return true;
+  }
+
+  // Choix du statut : un appui suffit.
   const choixStatut = el("div", { class: "statuts", role: "radiogroup", "aria-label": "Statut de la recette" },
     STATUTS.map((statut) => el("button", {
       type: "button", class: "statut", role: "radio", "data-valeur": statut.valeur,
-      "aria-checked": String(statut.valeur === lireStatut(recette)),
     }, `${statut.icone} ${statut.libelle}`)));
+  function afficherStatut() {
+    for (const bouton of choixStatut.querySelectorAll(".statut")) {
+      bouton.setAttribute("aria-checked", String(bouton.dataset.valeur === lireStatut(recette)));
+    }
+  }
   choixStatut.addEventListener("click", (evenement) => {
     const bouton = evenement.target.closest(".statut");
-    if (!bouton || bouton.getAttribute("aria-checked") === "true") return;
-    for (const autre of choixStatut.querySelectorAll(".statut")) {
-      autre.setAttribute("aria-checked", String(autre === bouton));
-    }
-    recette = avecStatut(recette, bouton.dataset.valeur);
-    synchro.enregistrer(recette);
+    if (bouton) appliquer("statut", bouton.dataset.valeur);
   });
+  afficherStatut();
+
+  // Notes personnelles : enregistrées sur demande (une modification = une ligne d'historique).
+  const champNotes = el("textarea", {
+    class: "notes-saisie", rows: "4", "aria-label": "Mes notes",
+    placeholder: "Moins de sucre, 5 minutes de cuisson en plus…",
+  });
+  champNotes.value = recette.notes ?? "";
+  const messageNotes = el("p", { class: "message", role: "status" });
+  const boutonNotes = el("button", { type: "button", class: "bouton bouton--secondaire" }, "Enregistrer les notes");
+  boutonNotes.addEventListener("click", () => {
+    const enregistre = appliquer("notes", champNotes.value.trim());
+    messageNotes.textContent = enregistre ? "Notes enregistrées." : "Aucun changement.";
+    messageNotes.className = `message message--${enregistre ? "succes" : "info"}`;
+  });
+
+  // Historique : la plus récente en premier, avec un retour en arrière possible.
+  const historique = el("div");
+  function afficherHistorique() {
+    const lignes = (Array.isArray(recette.historique) ? recette.historique : []).slice().reverse();
+    if (!lignes.length) {
+      historique.replaceChildren(el("p", { class: "discret" }, "Aucune modification pour l'instant."));
+      return;
+    }
+    historique.replaceChildren(el("ul", { class: "historique" }, lignes.map((ligne) => {
+      const dejaRevenu = valeurActuelle(recette, ligne.champ) === ligne.avant;
+      const libelleRetour = ligne.champ === "statut"
+        ? `↩ Revenir à « ${infosStatut(lireStatut({ statut: ligne.avant }))?.libelle ?? ligne.avant} »`
+        : "↩ Revenir aux notes précédentes";
+      return el("li", {},
+        el("span", { class: "discret" }, formaterDate(Date.parse(ligne.date))),
+        el("span", {}, formaterModification(ligne)),
+        !dejaRevenu && el("button", {
+          type: "button", class: "bouton bouton--secondaire bouton--petit",
+          onclick: () => appliquer(ligne.champ, ligne.avant),
+        }, libelleRetour));
+    })));
+  }
+  afficherHistorique();
 
   const message = el("p", { class: "message", role: "status" });
   const boutonPartager = el("button", { type: "button", class: "bouton bouton--secondaire" }, "📤 Partager");
@@ -231,7 +282,13 @@ async function vueRecette(id) {
         el("ul", { class: "ingredients" }, groupe.ingredients.map((ingredient) => el("li", {}, formaterIngredient(ingredient)))))),
       el("h3", {}, "Préparation"),
       el("ol", { class: "etapes" }, (recette.etapes ?? []).map((etape) => el("li", {}, String(etape)))),
-      recette.notes && [el("h3", {}, "Mes notes"), el("p", { class: "notes" }, String(recette.notes))]),
+      el("h3", {}, "Mes notes"),
+      champNotes,
+      el("div", { class: "barre-actions" }, boutonNotes),
+      messageNotes,
+      el("details", { class: "bloc-historique" },
+        el("summary", {}, "Historique des modifications"),
+        historique)),
   };
 }
 

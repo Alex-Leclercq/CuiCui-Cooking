@@ -12,6 +12,13 @@ const cheminRecette = (id) => `recettes/${id}/recette.json`;
 const versTexte = (recette) => JSON.stringify(recette, null, 2) + "\n";
 const egal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+// Historique : les lignes ajoutées des deux côtés sont toutes conservées, dans l'ordre chronologique.
+function fusionnerHistoriques(locale = [], distante = []) {
+  const lignes = new Map();
+  for (const ligne of [...distante, ...locale]) lignes.set(JSON.stringify(ligne), ligne);
+  return [...lignes.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
 // Fusion à trois versions : base (avant modification), locale et distante.
 // Renvoie la recette fusionnée, ou null si un même champ a été modifié différemment des deux côtés.
 export function fusionner(base, locale, distante) {
@@ -20,7 +27,8 @@ export function fusionner(base, locale, distante) {
   const cles = new Set([...Object.keys(base), ...Object.keys(locale), ...Object.keys(distante)]);
   for (const cle of cles) {
     let valeur;
-    if (egal(locale[cle], distante[cle]) || egal(locale[cle], base[cle])) valeur = distante[cle];
+    if (cle === "historique") valeur = fusionnerHistoriques(locale[cle], distante[cle]);
+    else if (egal(locale[cle], distante[cle]) || egal(locale[cle], base[cle])) valeur = distante[cle];
     else if (egal(distante[cle], base[cle])) valeur = locale[cle];
     else return null;
     if (valeur !== undefined) resultat[cle] = valeur;

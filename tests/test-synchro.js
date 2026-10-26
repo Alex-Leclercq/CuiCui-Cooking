@@ -45,6 +45,18 @@ const tests = {
     verifier(resultat.favori === true && resultat.nom === "A corrigé", JSON.stringify(resultat));
   },
 
+  "Fusion : historiques des deux côtés additionnés, dans l'ordre"() {
+    const ligne = (date, champ) => ({ date, champ, avant: "x", apres: "y" });
+    const commune = ligne("2026-10-27T08:00:00.000Z", "statut");
+    const base = { ...recette("a"), historique: [commune] };
+    const locale = { ...base, statut: "favorite", historique: [commune, ligne("2026-10-27T10:00:00.000Z", "statut")] };
+    const distante = { ...base, notes: "PC", historique: [commune, ligne("2026-10-27T09:00:00.000Z", "notes")] };
+    const resultat = fusionner(base, locale, distante);
+    verifier(resultat, "ne doit pas être un conflit");
+    verifier(resultat.statut === "favorite" && resultat.notes === "PC", "les deux champs doivent être gardés");
+    verifier(resultat.historique.map((l) => l.date.slice(11, 13)).join() === "08,09,10", JSON.stringify(resultat.historique));
+  },
+
   "Fusion : même champ modifié différemment → conflit"() {
     const base = recette("a");
     verifier(fusionner(base, { ...base, nom: "X" }, { ...base, nom: "Y" }) === null, "aurait dû être un conflit");

@@ -50,8 +50,9 @@ Les photos sont compressées en JPEG avant d'être enregistrées, avec environ 1
 | `tempsRepos` | nombre | non | En minutes (marinade, réfrigération, levée…). |
 | `ingredients` | liste d'objets | oui | Voir ci-dessous. |
 | `etapes` | liste de textes | oui | Une entrée par étape, dans l'ordre. |
-| `notes` | texte | non | Mes remarques personnelles. |
+| `notes` | texte | non | Mes remarques personnelles, modifiables dans l'application. |
 | `statut` | texte | oui | Où j'en suis avec cette recette (voir ci-dessous). `a-essayer` pour une nouvelle recette. |
+| `historique` | liste d'objets | non | Journal des modifications de statut et de notes (voir ci-dessous). |
 | `photos` | objet | non | `source` : liste des photos d'origine ; `plat` : photo du plat ou `null`. |
 | `dateAjout` | texte | oui | Date au format `AAAA-MM-JJ`. |
 
@@ -62,9 +63,32 @@ Les photos sont compressées en JPEG avant d'être enregistrées, avec environ 1
 | `a-essayer` | 📝 À essayer | Jamais cuisinée. Apparaît dans l'onglet « À essayer ». |
 | `cuisinee` | ✅ Déjà cuisinée | Testée, correcte. |
 | `favorite` | ⭐ Favorite | Testée et adorée. Apparaît dans l'onglet « Favoris ». |
-| `a-eviter` | 👎 À ne pas refaire | Testée, décevante. |
 
-Ancien format : les fiches qui ont encore `favori` et `aEssayer` (booléens) sont comprises par l'application. Elles passent au champ `statut` dès que le statut est changé dans l'application.
+Anciens formats, toujours compris par l'application :
+- `favori` et `aEssayer` (booléens) : la fiche passe au champ `statut` dès que le statut est changé dans l'application ;
+- `a-eviter` (statut retiré) : lu comme `cuisinee`.
+
+### `historique`
+
+Liste des modifications faites sur la recette, la plus ancienne en premier. L'application ajoute une ligne à chaque changement de statut ou de notes, et permet de revenir à la valeur précédente.
+
+| Champ | Description |
+|---|---|
+| `date` | Date et heure, au format ISO (`2026-10-27T09:12:00.000Z`). |
+| `champ` | `statut` ou `notes`. |
+| `avant` | Valeur avant la modification. |
+| `apres` | Valeur après la modification. |
+
+Exemple :
+
+```json
+"historique": [
+  { "date": "2026-10-27T09:12:00.000Z", "champ": "statut", "avant": "a-essayer", "apres": "favorite" },
+  { "date": "2026-10-27T09:15:00.000Z", "champ": "notes", "avant": "", "apres": "Moins de sucre" }
+]
+```
+
+Lors d'une synchronisation, les lignes ajoutées sur le téléphone et sur GitHub sont toutes conservées.
 
 ### `source`
 

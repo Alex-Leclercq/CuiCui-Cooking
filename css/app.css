@@ -259,20 +259,21 @@ body {
 
 .statuts {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
   margin: 12px 0;
 }
 
 .statut {
-  min-height: 44px;
-  padding: 8px;
+  min-height: 52px;
+  padding: 6px 4px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
   background: var(--surface);
   color: var(--texte);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
   cursor: pointer;
 }
 
@@ -356,8 +357,62 @@ body {
   margin-bottom: 10px;
 }
 
-.notes {
-  white-space: pre-wrap;
+.notes-saisie {
+  width: 100%;
+  min-height: 96px;
+  padding: 8px 12px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--texte);
+  font: inherit;
+  resize: vertical;
+}
+
+.notes-saisie:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.message--info {
+  color: var(--texte-doux);
+}
+
+/* Historique des modifications */
+
+.bloc-historique {
+  margin: 20px 0 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--bordure);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.bloc-historique summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.historique {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historique li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid var(--bordure);
+}
+
+.bouton--petit {
+  min-height: 36px;
+  padding: 4px 12px;
+  font-size: 0.85rem;
 }
 
 .conflit {
