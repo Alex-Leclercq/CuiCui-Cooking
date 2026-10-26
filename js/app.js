@@ -10,7 +10,7 @@ import {
   infosStatut, lireStatut, majuscule, modifier, recetteEnTexte, valeurActuelle,
 } from "./recette.js";
 
-const VERSION = "0.5.0";
+const VERSION = "0.6.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage();
@@ -93,13 +93,13 @@ function listeRecettes(entrees) {
   ];
 }
 
+// La synchronisation est automatique : son état et son bouton sont dans les Réglages,
+// et le badge en haut de l'écran signale ce qui demande attention.
 async function vueRecettes() {
-  const etat = el("p", { class: "discret" });
   const liste = el("div");
 
   async function rafraichir() {
     const [entrees, statut] = await Promise.all([stockage.lireRecettes(), synchro.lireEtat()]);
-    etat.textContent = texteEtat(statut);
 
     if (entrees.length === 0) {
       liste.replaceChildren(statut.configure
@@ -115,7 +115,7 @@ async function vueRecettes() {
 
   await rafraichir();
   return {
-    contenu: page("Mes recettes", el("div", { class: "barre-actions" }, boutonSynchroniser()), etat, liste),
+    contenu: page("Mes recettes", liste),
     rafraichir,
   };
 }
@@ -192,18 +192,25 @@ async function vueRecette(id) {
     ...(Array.isArray(recette.motsCles) ? recette.motsCles : []),
   ].filter(Boolean).map((etiquette) => majuscule(String(etiquette)));
 
-  // Toute modification (statut, notes, retour en arrière) passe par ici : nouvelle ligne
-  // d'historique, enregistrement sur le téléphone, envoi à GitHub, mise à jour de l'écran.
+  // Toute modification (statut, notes) passe par ici : ligne d'historique,
+  // enregistrement sur le téléphone, envoi à GitHub, mise à jour de l'écran.
   function appliquer(champ, valeur) {
     const nouvelle = modifier(recette, champ, valeur);
     if (nouvelle === recette) return false;
     recette = nouvelle;
     synchro.enregistrer(recette);
     afficherStatut();
-    champNotes.value = recette.notes ?? "";
-    afficherHistorique();
     return true;
   }
+
+  // Photo du plat (pas la page du livre) : chargée sans bloquer l'affichage de la recette.
+  const photoPlat = el("figure", { class: "photo-plat", hidden: true });
+  synchro.photo(id, recette.photos?.plat).then((image) => {
+    if (!image) return;
+    const adresse = URL.createObjectURL(image);
+    photoPlat.replaceChildren(el("img", { src: adresse, alt: `Photo : ${recette.nom ?? id}` }));
+    photoPlat.hidden = false;
+  });
 
   // Choix du statut : un appui suffit.
   const choixStatut = el("div", { class: "statuts", role: "radiogroup", "aria-label": "Statut de la recette" },
@@ -235,30 +242,6 @@ async function vueRecette(id) {
     messageNotes.className = `message message--${enregistre ? "succes" : "info"}`;
   });
 
-  // Historique : la plus récente en premier, avec un retour en arrière possible.
-  const historique = el("div");
-  function afficherHistorique() {
-    const lignes = (Array.isArray(recette.historique) ? recette.historique : []).slice().reverse();
-    if (!lignes.length) {
-      historique.replaceChildren(el("p", { class: "discret" }, "Aucune modification pour l'instant."));
-      return;
-    }
-    historique.replaceChildren(el("ul", { class: "historique" }, lignes.map((ligne) => {
-      const dejaRevenu = valeurActuelle(recette, ligne.champ) === ligne.avant;
-      const libelleRetour = ligne.champ === "statut"
-        ? `↩ Revenir à « ${infosStatut(lireStatut({ statut: ligne.avant }))?.libelle ?? ligne.avant} »`
-        : "↩ Revenir aux notes précédentes";
-      return el("li", {},
-        el("span", { class: "discret" }, formaterDate(Date.parse(ligne.date))),
-        el("span", {}, formaterModification(ligne)),
-        !dejaRevenu && el("button", {
-          type: "button", class: "bouton bouton--secondaire bouton--petit",
-          onclick: () => appliquer(ligne.champ, ligne.avant),
-        }, libelleRetour));
-    })));
-  }
-  afficherHistorique();
-
   const message = el("p", { class: "message", role: "status" });
   const boutonPartager = el("button", { type: "button", class: "bouton bouton--secondaire" }, "📤 Partager");
   boutonPartager.addEventListener("click", () => partager(recette, message));
@@ -267,6 +250,7 @@ async function vueRecette(id) {
     contenu: el("article", { class: "recette" },
       el("a", { href: "#/", class: "retour" }, "← Mes recettes"),
       el("h2", {}, String(recette.nom ?? id)),
+      photoPlat,
       source && el("p", { class: "discret" }, source),
       lienSource && el("p", {}, el("a", { href: lienSource, target: "_blank", rel: "noopener noreferrer" }, "Voir la recette en ligne")),
       infos && el("p", { class: "recette__infos" }, infos),
@@ -285,10 +269,7 @@ async function vueRecette(id) {
       el("h3", {}, "Mes notes"),
       champNotes,
       el("div", { class: "barre-actions" }, boutonNotes),
-      messageNotes,
-      el("details", { class: "bloc-historique" },
-        el("summary", {}, "Historique des modifications"),
-        historique)),
+      messageNotes),
   };
 }
 
@@ -353,6 +334,9 @@ async function vueReglages() {
   const etat = el("p", { class: "discret" });
   const conflits = el("div");
 
+  const historique = el("div");
+  let toutAfficher = false;
+
   async function rafraichir() {
     const statut = await synchro.lireEtat();
     etat.textContent = texteEtat(statut);
@@ -365,7 +349,49 @@ async function vueReglages() {
             "Garder ma version"),
           el("button", { type: "button", class: "bouton bouton--secondaire", onclick: () => synchro.choisirVersion(operation.id, "distante") },
             "Garder la version GitHub")))));
+    await afficherHistoriqueGlobal();
   }
+
+  // Historique de toutes les recettes, le plus récent en premier, avec retour en arrière.
+  async function afficherHistoriqueGlobal() {
+    const lignes = (await stockage.lireRecettes())
+      .flatMap((entree) => (Array.isArray(entree.recette.historique) ? entree.recette.historique : [])
+        .map((ligne) => ({ entree, ligne })))
+      .sort((a, b) => String(b.ligne.date).localeCompare(String(a.ligne.date)));
+    if (!lignes.length) {
+      historique.replaceChildren(el("p", { class: "discret" }, "Aucune modification pour l'instant."));
+      return;
+    }
+    const visibles = toutAfficher ? lignes : lignes.slice(0, LIGNES_HISTORIQUE);
+    historique.replaceChildren(
+      el("ul", { class: "historique" }, visibles.map(({ entree, ligne }) => {
+        const nom = String(entree.recette.nom ?? entree.id);
+        const dejaRevenu = valeurActuelle(entree.recette, ligne.champ) === ligne.avant;
+        const libelleRetour = ligne.champ === "statut"
+          ? `↩ Revenir à « ${infosStatut(lireStatut({ statut: ligne.avant }))?.libelle ?? ligne.avant} »`
+          : "↩ Revenir aux notes précédentes";
+        return el("li", {},
+          el("span", { class: "discret" }, formaterDate(Date.parse(ligne.date))),
+          el("a", { href: `#/recette/${encodeURIComponent(entree.id)}`, class: "historique__recette" }, nom),
+          el("span", {}, formaterModification(ligne)),
+          !dejaRevenu && el("button", {
+            type: "button", class: "bouton bouton--secondaire bouton--petit",
+            onclick: () => revenir(entree.id, ligne),
+          }, libelleRetour));
+      })),
+      lignes.length > LIGNES_HISTORIQUE && el("button", {
+        type: "button", class: "bouton bouton--secondaire bouton--petit",
+        onclick: () => { toutAfficher = !toutAfficher; afficherHistoriqueGlobal(); },
+      }, toutAfficher ? "Afficher moins" : `Tout afficher (${lignes.length})`));
+  }
+
+  async function revenir(id, ligne) {
+    const entree = await stockage.lireRecette(id);
+    if (!entree) return;
+    const nouvelle = modifier(entree.recette, ligne.champ, ligne.avant);
+    if (nouvelle !== entree.recette) synchro.enregistrer(nouvelle); // la synchro rafraîchit l'écran
+  }
+
   await rafraichir();
 
   const horsLigne = el("p", { class: "discret" }, "Vérification du mode hors ligne…");
@@ -380,10 +406,16 @@ async function vueReglages() {
       el("section", { class: "carte" },
         el("p", {}, el("strong", {}, "À propos")),
         el("p", { class: "discret" }, `CuiCui Cooking, version ${VERSION}.`),
-        horsLigne)),
+        horsLigne),
+      el("section", { class: "carte" },
+        el("p", {}, el("strong", {}, "Historique des modifications")),
+        el("p", { class: "discret" }, "Changements de statut et de notes sur toutes les recettes."),
+        historique)),
     rafraichir,
   };
 }
+
+const LIGNES_HISTORIQUE = 20;
 
 const vues = {
   "/": vueRecettes,
@@ -461,6 +493,7 @@ async function mettreAJourBadge() {
   const badge = document.getElementById("etat-synchro");
   const etat = await synchro.lireEtat();
   if (etat.conflits.length) badge.textContent = "⚠️ Conflit";
+  else if (etat.derniereErreur && !etat.derniereErreur.estHorsLigne) badge.textContent = "⚠️ Synchro";
   else if (etat.enCours) badge.textContent = "🔄";
   else if (etat.enAttente) badge.textContent = `${etat.enAttente} en attente`;
   else badge.textContent = "";

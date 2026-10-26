@@ -221,6 +221,59 @@ const tests = {
     verifier(!(await stockage.lireRecette("cassee")), "la recette illisible doit être ignorée");
   },
 
+  async "Photos : empreintes des fichiers de chaque recette mémorisées"() {
+    const { synchro, stockage, github } = await environnement();
+    github.ecrire(chemin("a"), texte(recette("a")));
+    github.ecrire("recettes/a/plat.jpg", "IMAGE-A");
+    github.ecrire("recettes/a/source-1.jpg", "PAGE-A");
+    await synchro.synchroniser();
+    const entree = await stockage.lireRecette("a");
+    verifier(Object.keys(entree.fichiers).sort().join() === "plat.jpg,source-1.jpg", JSON.stringify(entree.fichiers));
+  },
+
+  async "Photos : nouvelle photo ajoutée sans changer la fiche → repérée"() {
+    const { synchro, stockage, github } = await environnement();
+    github.ecrire(chemin("a"), texte(recette("a")));
+    await synchro.synchroniser();
+    github.ecrire("recettes/a/plat.jpg", "IMAGE-A");
+    await synchro.synchroniser();
+    verifier((await stockage.lireRecette("a")).fichiers?.["plat.jpg"], "la photo doit être repérée");
+  },
+
+  async "Photos : téléchargée une seule fois, puis disponible hors ligne"() {
+    const { synchro, github } = await environnement();
+    github.ecrire(chemin("a"), texte(recette("a")));
+    github.ecrire("recettes/a/plat.jpg", "IMAGE-A");
+    await synchro.synchroniser();
+    github.etat.appels.length = 0;
+    const premiere = await synchro.photo("a", "plat.jpg");
+    verifier(premiere && (await premiere.text()) === "IMAGE-A" && premiere.type === "image/jpeg", "photo incorrecte");
+    github.etat.horsLigne = true;
+    const seconde = await synchro.photo("a", "plat.jpg");
+    verifier(seconde && (await seconde.text()) === "IMAGE-A", "la photo doit rester disponible hors ligne");
+    verifier(github.etat.appels.filter((a) => a.includes("/git/blobs/")).length === 1, github.etat.appels.join(" | "));
+  },
+
+  async "Photos : absente ou hors ligne au premier affichage → rien, sans erreur"() {
+    const { synchro, github } = await environnement();
+    github.ecrire(chemin("a"), texte(recette("a")));
+    github.ecrire("recettes/a/plat.jpg", "IMAGE-A");
+    await synchro.synchroniser();
+    verifier((await synchro.photo("a", "inexistante.jpg")) === null, "photo inexistante");
+    verifier((await synchro.photo("a", undefined)) === null, "pas de nom de photo");
+    github.etat.horsLigne = true;
+    verifier((await synchro.photo("a", "plat.jpg")) === null, "hors ligne sans cache");
+  },
+
+  async "Modifier une recette sur le téléphone garde la liste de ses photos"() {
+    const { synchro, stockage, github } = await environnement();
+    github.ecrire(chemin("a"), texte(recette("a")));
+    github.ecrire("recettes/a/plat.jpg", "IMAGE-A");
+    await synchro.synchroniser();
+    await synchro.enregistrer(recette("a", { statut: "favorite" }));
+    verifier((await stockage.lireRecette("a")).fichiers?.["plat.jpg"], "la photo doit rester connue");
+  },
+
   async "Le jeton n'est jamais renvoyé à l'interface"() {
     const { synchro } = await environnement();
     const config = await synchro.lireConfig();
