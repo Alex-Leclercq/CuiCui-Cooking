@@ -5,8 +5,9 @@
 import { ouvrirStockage } from "./stockage.js";
 import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
+import { formaterIngredient, formaterInfos, formaterSource, grouperIngredients, recetteEnTexte } from "./recette.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage();
@@ -94,9 +95,10 @@ async function vueRecettes() {
       el("ul", { class: "liste-recettes" }, entrees.map((entree) => {
         const { chef, source } = entree.recette;
         const details = [chef, source?.titre].filter(Boolean).join(" · ");
-        return el("li", { class: "carte" },
-          el("strong", {}, nom(entree)),
-          details && el("span", { class: "discret" }, details));
+        return el("li", {},
+          el("a", { class: "carte lien-recette", href: `#/recette/${encodeURIComponent(entree.id)}` },
+            el("strong", {}, nom(entree)),
+            details && el("span", { class: "discret" }, details)));
       })));
   }
 
@@ -104,6 +106,91 @@ async function vueRecettes() {
   return {
     contenu: page("Mes recettes", el("div", { class: "barre-actions" }, boutonSynchroniser()), etat, liste),
     rafraichir,
+  };
+}
+
+const CATEGORIES = {
+  aperitif: "Apéritif", entree: "Entrée", plat: "Plat", accompagnement: "Accompagnement",
+  dessert: "Dessert", boisson: "Boisson", sauce: "Sauce", autre: "Autre",
+};
+
+// N'accepte que les liens web : une adresse « javascript: » venue d'une recette serait dangereuse.
+function lienWeb(adresse) {
+  try {
+    const url = new URL(adresse);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+// Ouvre le menu de partage du téléphone, ou copie la recette si le navigateur ne sait pas partager.
+async function partager(recette, message) {
+  const texte = recetteEnTexte(recette);
+  const afficherMessage = (contenu, type) => {
+    message.textContent = contenu;
+    message.className = `message message--${type}`;
+  };
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: String(recette.nom ?? recette.id), text: texte });
+    } catch (erreur) {
+      if (erreur.name !== "AbortError") afficherMessage("Le partage a échoué.", "erreur");
+    }
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(texte);
+    afficherMessage("Recette copiée : collez-la dans un message.", "succes");
+  } catch {
+    afficherMessage("Le partage n'est pas disponible sur cet appareil.", "erreur");
+  }
+}
+
+async function vueRecette(id) {
+  const entree = await stockage.lireRecette(id);
+  if (!entree) {
+    return {
+      contenu: page("Recette introuvable",
+        pageVide("🤔", "Cette recette n'existe pas ou plus.", "Elle a peut-être été supprimée du dépôt.",
+          el("a", { href: "#/", class: "bouton" }, "Retour aux recettes"))),
+    };
+  }
+
+  const { recette } = entree;
+  const source = formaterSource(recette);
+  const lienSource = lienWeb(recette.source?.url);
+  const infos = formaterInfos(recette);
+  const etiquettes = [
+    recette.favori && "⭐ Favori",
+    recette.aEssayer && "📝 À essayer",
+    CATEGORIES[recette.categorie] ?? recette.categorie,
+    recette.cuisine,
+    recette.difficulte,
+    ...(Array.isArray(recette.motsCles) ? recette.motsCles : []),
+  ].filter(Boolean);
+
+  const message = el("p", { class: "message", role: "status" });
+  const boutonPartager = el("button", { type: "button", class: "bouton" }, "📤 Partager");
+  boutonPartager.addEventListener("click", () => partager(recette, message));
+
+  return {
+    contenu: el("article", { class: "recette" },
+      el("a", { href: "#/", class: "retour" }, "← Mes recettes"),
+      el("h2", {}, String(recette.nom ?? id)),
+      source && el("p", { class: "discret" }, source),
+      lienSource && el("p", {}, el("a", { href: lienSource, target: "_blank", rel: "noopener noreferrer" }, "Voir la recette en ligne")),
+      infos && el("p", { class: "recette__infos" }, infos),
+      etiquettes.length > 0 && el("ul", { class: "etiquettes" }, etiquettes.map((etiquette) => el("li", {}, String(etiquette)))),
+      el("div", { class: "barre-actions" }, boutonPartager),
+      message,
+      el("h3", {}, "Ingrédients"),
+      grouperIngredients(recette.ingredients).map((groupe) => el("section", {},
+        groupe.nom && el("h4", {}, String(groupe.nom)),
+        el("ul", { class: "ingredients" }, groupe.ingredients.map((ingredient) => el("li", {}, formaterIngredient(ingredient)))))),
+      el("h3", {}, "Préparation"),
+      el("ol", { class: "etapes" }, (recette.etapes ?? []).map((etape) => el("li", {}, String(etape)))),
+      recette.notes && [el("h3", {}, "Mes notes"), el("p", { class: "notes" }, String(recette.notes))]),
   };
 }
 
@@ -224,15 +311,29 @@ const vues = {
 let rafraichirVue = null;
 let numeroAffichage = 0;
 
+const PREFIXE_RECETTE = "/recette/";
+
 function routeCourante() {
   const route = location.hash.replace(/^#/, "") || "/";
+  if (route.startsWith(PREFIXE_RECETTE)) return route;
   return route in vues ? route : "/";
+}
+
+function chargerVue(route) {
+  if (!route.startsWith(PREFIXE_RECETTE)) return vues[route]();
+  let id;
+  try {
+    id = decodeURIComponent(route.slice(PREFIXE_RECETTE.length));
+  } catch {
+    id = "";
+  }
+  return vueRecette(id);
 }
 
 async function afficher() {
   const numero = ++numeroAffichage;
   const route = routeCourante();
-  const { contenu, rafraichir } = await vues[route]();
+  const { contenu, rafraichir } = await chargerVue(route);
   if (numero !== numeroAffichage) return; // une autre page a été demandée entre-temps
 
   rafraichirVue = rafraichir ?? null;
@@ -240,8 +341,10 @@ async function afficher() {
   conteneur.replaceChildren(contenu);
   conteneur.scrollTop = 0;
 
+  // Le détail d'une recette reste rattaché à l'onglet « Recettes ».
+  const onglet = route.startsWith(PREFIXE_RECETTE) ? "/" : route;
   for (const lien of document.querySelectorAll(".navigation a")) {
-    if (lien.dataset.route === route) lien.setAttribute("aria-current", "page");
+    if (lien.dataset.route === onglet) lien.setAttribute("aria-current", "page");
     else lien.removeAttribute("aria-current");
   }
 }

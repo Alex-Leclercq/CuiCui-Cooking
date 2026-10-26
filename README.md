@@ -16,6 +16,7 @@
 - **Mes meilleures recettes :** je marque d'une étoile les recettes que je considère comme les meilleures, pour les retrouver dans une liste de favoris.
 - **Recettes à essayer :** je marque les recettes que je n'ai encore jamais cuisinées. Elles forment une sorte de to-do list, et je les coche une fois réalisées.
 - **Classement :** chaque recette a une catégorie (entrée, plat, dessert…), une cuisine (française, japonaise…), une difficulté et des mots-clés libres (végétarien, rapide, hiver…).
+- **Partager une recette :** un bouton envoie la recette en texte (ingrédients, étapes, temps, source) par WhatsApp, SMS, e-mail… via le menu de partage du téléphone. Mes notes personnelles ne sont pas partagées.
 - **Liste de courses :** je sélectionne plusieurs recettes et l'application me donne une seule liste de courses qui regroupe tous les ingrédients nécessaires.
 - **En cuisine :**
   - j'ajuste le nombre de portions et les quantités sont recalculées ;
@@ -90,7 +91,8 @@ Recommandations pour le compte GitHub : activer la **double authentification (2F
 | `js/stockage.js` | Le stockage local sur le téléphone (IndexedDB) : copie des recettes, file d'attente, réglages. |
 | `js/github.js` | Les échanges avec l'API GitHub (lecture et écriture des fichiers). |
 | `js/synchro.js` | La synchronisation : envoi, réception, fusion et conflits. |
-| `tests/` | Les tests de la synchronisation, avec un faux GitHub en mémoire. |
+| `js/recette.js` | La mise en forme d'une recette en texte (quantités, durées, texte partagé). |
+| `tests/` | Les tests : synchronisation (avec un faux GitHub en mémoire) et mise en forme des recettes. |
 | `sw.js` | Le « service worker » qui garde l'application en mémoire pour l'utiliser hors ligne. |
 | `manifest.webmanifest` | La carte d'identité de l'application (nom, icône, couleurs), qui permet de l'installer sur le téléphone. |
 | `icones/` | Les icônes de l'application. |
@@ -106,7 +108,9 @@ powershell -ExecutionPolicy Bypass -File outils\serveur-local.ps1
 
 Puis ouvrir http://localhost:8080 dans le navigateur. `Ctrl+C` arrête le serveur.
 
-Les tests de la synchronisation s'ouvrent sur http://localhost:8080/tests/test-synchro.html. Ils utilisent un faux GitHub en mémoire : aucun appel réseau, aucun jeton.
+Les tests s'ouvrent dans le navigateur :
+- synchronisation : http://localhost:8080/tests/test-synchro.html (faux GitHub en mémoire : aucun appel réseau, aucun jeton) ;
+- mise en forme des recettes : http://localhost:8080/tests/test-recette.html
 
 ## Installer sur le téléphone
 
@@ -125,7 +129,9 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [x] Créer le squelette de l'application (PWA installable, hors ligne, GitHub Pages)
 - [x] Choisir l'hébergement (code public sur GitHub Pages, recettes dans un dépôt privé)
 - [x] Connecter l'application au dépôt des recettes (jeton, lecture, écriture, synchronisation)
-- [ ] Afficher la liste des recettes et le détail d'une recette
+- [x] Afficher la liste des recettes et le détail d'une recette
+- [x] Partager une recette en texte (menu de partage du téléphone)
+- [ ] Afficher les photos d'une recette (page d'origine, photo du plat)
 - [ ] Ajouter et modifier une recette à la main
 - [ ] Marquer les meilleures recettes (favoris)
 - [ ] Marquer les recettes jamais cuisinées (à essayer)
