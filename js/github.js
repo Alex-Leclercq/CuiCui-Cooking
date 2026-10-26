@@ -97,6 +97,12 @@ export function creerClientGitHub({ proprietaire, depot, jeton, fetch: appeler =
       return depuisBase64((await requete(`/git/blobs/${sha}`)).content);
     },
 
+    // Contenu binaire d'un fichier (photo) à partir de son empreinte.
+    async lireBlobBinaire(sha) {
+      const binaire = atob((await requete(`/git/blobs/${sha}`)).content.replace(/\s/g, ""));
+      return Uint8Array.from(binaire, (caractere) => caractere.charCodeAt(0));
+    },
+
     // Contenu actuel d'un fichier, ou null s'il n'existe pas.
     async lireFichier(chemin) {
       try {

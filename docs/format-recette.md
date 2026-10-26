@@ -70,7 +70,7 @@ Anciens formats, toujours compris par l'application :
 
 ### `historique`
 
-Liste des modifications faites sur la recette, la plus ancienne en premier. L'application ajoute une ligne à chaque changement de statut ou de notes, et permet de revenir à la valeur précédente.
+Liste des modifications faites sur la recette, la plus ancienne en premier. L'application ajoute une ligne à chaque changement de statut ou de notes. Les historiques de toutes les recettes sont affichés ensemble dans **Réglages → Historique des modifications**, avec un retour à la valeur précédente.
 
 | Champ | Description |
 |---|---|

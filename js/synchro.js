@@ -7,7 +7,7 @@
 // - Conflits : GitHub refuse une écriture basée sur une version périmée. On fusionne alors
 //   champ par champ ; si les deux côtés ont modifié le même champ, l'utilisateur choisit.
 
-const CHEMIN_RECETTE = /^recettes\/([^/]+)\/recette\.json$/;
+const DOSSIER_RECETTE = /^recettes\/([^/]+)\/([^/]+)$/;
 const cheminRecette = (id) => `recettes/${id}/recette.json`;
 const versTexte = (recette) => JSON.stringify(recette, null, 2) + "\n";
 const egal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -83,15 +83,21 @@ export function creerSynchro({ stockage, creerClient }) {
     await terminerEnvoi(operation, fusion, sha);
   }
 
+  // Écrit l'entrée locale d'une recette en gardant ce qui n'a pas changé (liste de ses fichiers…).
+  async function mettreAJourEntree(id, changements) {
+    const existante = await stockage.lireRecette(id);
+    await stockage.ecrireRecette({ ...existante, id, ...changements });
+  }
+
   async function terminerEnvoi(operation, recette, sha) {
     const actuelle = await stockage.lireAttente(operation.id);
     if (actuelle && actuelle.date !== operation.date) {
       // Modifiée à nouveau pendant l'envoi : la nouvelle version partira au prochain passage.
       await stockage.ecrireAttente({ ...actuelle, shaBase: sha, recetteBase: recette });
-      await stockage.ecrireRecette({ id: operation.id, recette: actuelle.recette, sha });
+      await mettreAJourEntree(operation.id, { recette: actuelle.recette, sha });
     } else {
       await stockage.supprimerAttente(operation.id);
-      await stockage.ecrireRecette({ id: operation.id, recette, sha });
+      await mettreAJourEntree(operation.id, { recette, sha });
     }
   }
 
@@ -101,20 +107,31 @@ export function creerSynchro({ stockage, creerClient }) {
     const commit = await github.dernierCommit();
     if (commit === (await stockage.lireMeta("dernierCommit"))) return;
 
+    // Pour chaque recette : l'empreinte de recette.json et celles de ses autres fichiers (photos).
     const distants = new Map();
     for (const fichier of commit ? await github.arborescence(commit) : []) {
-      const correspondance = fichier.type === "blob" && fichier.path.match(CHEMIN_RECETTE);
-      if (correspondance) distants.set(correspondance[1], fichier.sha);
+      const correspondance = fichier.type === "blob" && fichier.path.match(DOSSIER_RECETTE);
+      if (!correspondance) continue;
+      const [, id, nom] = correspondance;
+      if (!distants.has(id)) distants.set(id, { sha: null, fichiers: {} });
+      if (nom === "recette.json") distants.get(id).sha = fichier.sha;
+      else distants.get(id).fichiers[nom] = fichier.sha;
     }
+    for (const [id, distant] of distants) if (!distant.sha) distants.delete(id);
+
     const locales = new Map((await stockage.lireRecettes()).map((entree) => [entree.id, entree]));
     const enAttente = new Set((await stockage.lireToutesAttentes()).map((operation) => operation.id));
 
-    for (const [id, sha] of distants) {
+    for (const [id, { sha, fichiers }] of distants) {
+      const locale = locales.get(id);
       // Une recette modifiée sur le téléphone et pas encore envoyée n'est pas écrasée.
-      if (enAttente.has(id) || locales.get(id)?.sha === sha) continue;
+      if (enAttente.has(id) || locale?.sha === sha) {
+        if (locale && !egal(locale.fichiers ?? {}, fichiers)) await mettreAJourEntree(id, { fichiers });
+        continue;
+      }
       try {
         const recette = JSON.parse(await github.lireBlob(sha));
-        await stockage.ecrireRecette({ id, recette, sha });
+        await mettreAJourEntree(id, { recette, sha, fichiers });
       } catch (erreur) {
         if (!(erreur instanceof SyntaxError)) throw erreur;
         console.warn(`Recette illisible ignorée : ${id}`);
@@ -124,6 +141,29 @@ export function creerSynchro({ stockage, creerClient }) {
       if (!distants.has(id) && !enAttente.has(id)) await stockage.supprimerRecette(id);
     }
     await stockage.ecrireMeta("dernierCommit", commit);
+  }
+
+  // ---- Photos ----
+  // Téléchargées à la première consultation, puis gardées sur le téléphone (hors ligne).
+
+  const TYPES_PHOTO = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+
+  async function photo(id, nom) {
+    if (!nom) return null;
+    const sha = (await stockage.lireRecette(id))?.fichiers?.[nom];
+    if (!sha) return null;
+    const enCache = await stockage.lirePhoto(sha);
+    if (enCache) return enCache;
+    const github = await client();
+    if (!github) return null;
+    try {
+      const extension = nom.split(".").pop().toLowerCase();
+      const image = new Blob([await github.lireBlobBinaire(sha)], { type: TYPES_PHOTO[extension] ?? "image/jpeg" });
+      await stockage.ecrirePhoto(sha, image);
+      return image;
+    } catch {
+      return null; // hors ligne : la photo sera téléchargée plus tard
+    }
   }
 
   // ---- Orchestration ----
@@ -166,6 +206,7 @@ export function creerSynchro({ stockage, creerClient }) {
 
   return {
     synchroniser,
+    photo,
 
     ecouter(ecouteur) {
       ecouteurs.add(ecouteur);
@@ -177,7 +218,7 @@ export function creerSynchro({ stockage, creerClient }) {
     async enregistrer(recette) {
       const existante = await stockage.lireRecette(recette.id);
       const precedente = await stockage.lireAttente(recette.id);
-      await stockage.ecrireRecette({ id: recette.id, recette, sha: existante?.sha ?? null });
+      await mettreAJourEntree(recette.id, { recette, sha: existante?.sha ?? null });
       await stockage.ecrireAttente({
         id: recette.id,
         recette,
@@ -200,7 +241,7 @@ export function creerSynchro({ stockage, creerClient }) {
         await stockage.ecrireAttente({ ...operation, conflit: null, shaBase: sha, recetteBase: recetteDistante });
       } else {
         await stockage.supprimerAttente(id);
-        await stockage.ecrireRecette({ id, recette: recetteDistante, sha });
+        await mettreAJourEntree(id, { recette: recetteDistante, sha });
       }
       notifier("modification");
       return synchroniser().catch(() => {});
