@@ -10,7 +10,7 @@ import {
   infosStatut, lireStatut, majuscule, recetteEnTexte,
 } from "./recette.js";
 
-const VERSION = "0.4.0";
+const VERSION = "0.4.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage();
@@ -421,12 +421,38 @@ function suivreConnexion() {
   mettreAJour();
 }
 
+// ---- Mises à jour de l'application ----
+// Une nouvelle version est cherchée à l'ouverture et à chaque retour sur l'application.
+// Quand elle prend la main, la page est rechargée : tout de suite si l'application vient
+// de s'ouvrir, sinon via un bandeau, pour ne jamais perdre une saisie en cours.
+
+const OUVERTURE = Date.now();
+
+function verifierMiseAJour() {
+  navigator.serviceWorker?.getRegistration()
+    .then((enregistrement) => enregistrement?.update())
+    .catch(() => {}); // hors ligne : on réessaiera au prochain retour
+}
+
+function proposerMiseAJour() {
+  if (document.querySelector(".bandeau-maj")) return;
+  const bandeau = el("div", { class: "bandeau-maj", role: "status" },
+    el("span", {}, "Nouvelle version disponible."),
+    el("button", { type: "button", class: "bouton", onclick: () => location.reload() }, "Mettre à jour"));
+  document.querySelector(".entete").after(bandeau);
+}
+
 function enregistrerServiceWorker() {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch((erreur) => {
-      console.error("Échec de l'installation du mode hors ligne :", erreur);
-    });
-  }
+  if (!("serviceWorker" in navigator)) return;
+  const avaitUneVersion = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!avaitUneVersion) return; // première installation : rien à recharger
+    if (Date.now() - OUVERTURE < 10_000) location.reload();
+    else proposerMiseAJour();
+  });
+  navigator.serviceWorker.register("sw.js").catch((erreur) => {
+    console.error("Échec de l'installation du mode hors ligne :", erreur);
+  });
 }
 
 synchro.ecouter(() => {
@@ -434,9 +460,11 @@ synchro.ecouter(() => {
   mettreAJourBadge();
 });
 
-// Synchronisation à l'ouverture et à chaque retour sur l'application.
+// Synchronisation et recherche de mise à jour à l'ouverture et à chaque retour sur l'application.
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") synchro.synchroniser().catch(() => {});
+  if (document.visibilityState !== "visible") return;
+  synchro.synchroniser().catch(() => {});
+  verifierMiseAJour();
 });
 
 window.addEventListener("hashchange", afficher);
