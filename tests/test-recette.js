@@ -219,6 +219,23 @@ const tests = {
     egal(groupes.map((g) => `${g.cle}:${g.titre}`).join(","), "autre:Autre livre,mentor:Méthode Mentor,null:Sans livre");
   },
 
+  "Pluriel : le nom et ses adjectifs s'accordent, pas le complément"() {
+    const pluriels = [
+      ["piment vert doux", "2 piments verts doux"],
+      ["oignon grelot rouge", "2 oignons grelots rouges"],
+      ["pomme verte", "2 pommes vertes"],
+      ["jaune d'œuf", "2 jaunes d'œuf"],
+      ["filet de hareng fumé", "2 filets de hareng fumé"],
+      ["os à moelle", "2 os à moelle"],
+      ["pomme de terre", "2 pommes de terre"],
+      ["saucisse de Morteau", "2 saucisses de Morteau"],
+      ["pomme golden", "2 pommes golden"],
+      ["pomme granny-smith", "2 pommes granny-smith"],
+    ];
+    for (const [nom, attendu] of pluriels) egal(formaterIngredient(ingredient(2, null, nom)), attendu);
+    egal(formaterIngredient(ingredient(1, null, "piment vert doux")), "1 piment vert doux");
+  },
+
   "Portions : gratin dauphinois de 6 à 4 personnes"() {
     const gratin = {
       portions: 6,
