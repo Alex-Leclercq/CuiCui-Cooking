@@ -14,6 +14,7 @@ Application web installable (PWA) de recettes de cuisine, pour un téléphone An
 
 - Toujours commencer par `git pull`.
 - **Code de l'application** : une branche par fonctionnalité, puis une pull request. Ne jamais pousser du code directement sur `main` (`main` = version installée sur le téléphone).
+- **Pull requests** : Claude les crée et les fusionne lui-même avec `gh` (`gh pr create`, puis `gh pr merge --merge --delete-branch`), une fois les tests au vert, puis donne le lien et un résumé. Si l'utilisateur dit « attends avant de fusionner », s'arrêter à la création de la pull request. Sur ce PC, `gh` est dans `C:\Program Files\GitHub CLI\gh.exe` ; l'appeler par ce chemin s'il n'est pas trouvé. Ne jamais afficher le jeton (`gh auth token`).
 - **Petites corrections de documentation** : directement sur `main`, après accord de l'utilisateur.
 - **Ajout de recettes depuis des captures** : dans le dépôt `CuiCui-Recettes`, directement sur `main`. Vérifier qu'aucun identifiant n'existe déjà avant de créer un dossier.
 - Cocher l'étape correspondante de la feuille de route du README quand une fonctionnalité est terminée.
