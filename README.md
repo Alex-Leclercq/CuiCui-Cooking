@@ -25,10 +25,10 @@
 - **Partager une recette :** un bouton envoie la recette en texte (ingrédients, étapes, temps, source) par WhatsApp, SMS, e-mail… via le menu de partage du téléphone. Mes notes personnelles ne sont pas partagées.
 - **Liste de courses (onglet 🛒 Courses) :**
   - j'ajoute une recette avec **🛒 Ajouter à la liste**, pour le nombre de personnes affiché (si je change ce nombre ensuite, le bouton propose de **mettre à jour la liste**). Ou, dans Mes recettes, Favoris ou À essayer, **🛒 Sélectionner** me laisse cocher plusieurs recettes et les ajouter d'un coup, chacune pour son nombre de personnes d'origine ;
-  - les ingrédients identiques sont additionnés (200 g + 0,5 kg de farine = 700 g) et rangés par ordre alphabétique. En magasin, je touche un article pour le barrer : il descend en bas de la liste. S'il en faut davantage ensuite (recette ajoutée, personnes en plus), il redevient à acheter ;
-  - les ingrédients sans quantité (sel, poivre…) sont regroupés une seule fois dans **À vérifier dans les placards** ;
-  - sous la liste, chaque recette garde son réglage − / + et un bouton **✕ Retirer** ; **🗑️ Vider la liste** efface tout, après confirmation ;
-  - **📤 Partager** envoie en texte ce qui reste à acheter. La liste reste sur le téléphone : elle n'est pas envoyée à GitHub.
+  - la liste présente chaque recette avec, en dessous, ses ingrédients pour son nombre de personnes. Un appui sur le titre d'une recette plie ou déplie ses ingrédients (le choix est retenu), et le compteur indique ce qui reste à acheter (« 3 / 7 », puis « ✓ Tout acheté ») ;
+  - en magasin, je touche un article pour le barrer : il descend en bas de sa recette. Si je change ensuite le nombre de personnes, il redevient à acheter (sauf les ingrédients sans quantité, comme le sel) ;
+  - chaque recette garde son réglage − / +, un bouton **Voir** pour l'ouvrir et un bouton **✕** pour la retirer ; **🗑️ Vider la liste** efface tout, après confirmation ;
+  - **📤 Partager** envoie en texte, recette par recette, ce qui reste à acheter. La liste reste sur le téléphone : elle n'est pas envoyée à GitHub.
 - **En cuisine :**
   - j'ajuste le nombre de personnes (− / +) et les quantités sont recalculées, arrondies à ce qui se mesure en cuisine (œufs à l'entier, cuillères et pièces au ½ près, passage en kg ou en litres). Le réglage n'est jamais enregistré : la recette se rouvre toujours sur son nombre d'origine. Les recettes sans nombre de personnes (pâtes fraîches, bouillons, fonds) n'ont pas de réglage, et les quantités citées dans les étapes restent celles d'origine ;
   - le bouton **🔆 Garder l'écran allumé** d'une recette empêche le téléphone de se mettre en veille pendant que je cuisine. Il s'arrête en quittant la recette ou en touchant à nouveau le bouton, et reprend tout seul si je reviens dans l'application après l'avoir quittée un instant. Il n'apparaît pas si le navigateur ne sait pas le faire.
@@ -103,7 +103,7 @@ Recommandations pour le compte GitHub : activer la **double authentification (2F
 | `js/github.js` | Les échanges avec l'API GitHub (lecture et écriture des fichiers). |
 | `js/synchro.js` | La synchronisation : envoi, réception, fusion et conflits. |
 | `js/recette.js` | La mise en forme d'une recette en texte (quantités, durées, texte partagé). |
-| `js/courses.js` | La liste de courses : addition des ingrédients, articles cochés, texte partagé. |
+| `js/courses.js` | La liste de courses : ingrédients de chaque recette, articles cochés, texte partagé. |
 | `tests/` | Les tests : synchronisation (avec un faux GitHub en mémoire), mise en forme des recettes et liste de courses. |
 | `sw.js` | Le « service worker » qui garde l'application en mémoire pour l'utiliser hors ligne. |
 | `manifest.webmanifest` | La carte d'identité de l'application (nom, icône, couleurs), qui permet de l'installer sur le téléphone. |

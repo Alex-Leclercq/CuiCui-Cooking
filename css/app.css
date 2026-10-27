@@ -737,14 +737,67 @@ body {
   gap: 8px;
 }
 
-.courses__recette a {
+/* Titre d'une recette : un appui plie ou déplie ses ingrédients. */
+.courses__plier {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
   color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.courses__plier strong {
+  flex: 1;
+}
+
+/* Chevron dessiné en CSS : pointe vers le bas quand la recette est dépliée. */
+.courses__chevron {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin: 0 4px;
+  border-right: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+
+.courses__plier[aria-expanded="true"] .courses__chevron {
+  transform: rotate(45deg);
+}
+
+.courses__compte {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .courses__recette .portions {
   margin: 0;
 }
 
-.courses__retirer {
+.courses__liens {
+  display: flex;
+  gap: 8px;
   margin-left: auto;
+}
+
+.courses__recette .courses {
+  margin: 0;
+}
+
+.courses__recette .courses li:last-child .courses__article {
+  border-bottom: 0;
+}
+
+/* Réglage des personnes plus compact dans la liste, pour tenir sur une ligne avec Voir et ✕. */
+.courses__recette .portions__bouton {
+  width: 36px;
+  height: 36px;
 }

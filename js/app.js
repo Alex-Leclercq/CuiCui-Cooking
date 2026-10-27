@@ -12,10 +12,10 @@ import {
 } from "./recette.js";
 import {
   ajouterALaListe, cocherArticle, construireListe, listeEnTexte, listeVide, nettoyerCoches, normaliserListe,
-  portionsOrigine, retirerDeLaListe,
+  plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.11.0";
+const VERSION = "0.12.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -770,8 +770,8 @@ async function vueReglages() {
 
 const LIGNES_HISTORIQUE = 20;
 
-// Liste de courses : ingrédients additionnés de toutes les recettes choisies, à cocher en magasin.
-// Les articles cochés descendent en bas ; les ingrédients sans quantité sont à vérifier à part.
+// Liste de courses : recette par recette, ses ingrédients à cocher en magasin.
+// Les articles cochés descendent en bas de leur recette.
 async function vueCourses() {
   const contenu = el("div");
   const message = el("p", { class: "message", role: "status" });
@@ -800,25 +800,40 @@ async function vueCourses() {
         }),
         el("span", {}, article.texte)))));
 
-  // Une recette de la liste : son nombre de personnes se règle ici aussi, et elle peut être retirée.
-  function ligneRecette(recette) {
+  // Une recette de la liste et ses ingrédients. Le titre plie ou déplie les ingrédients (retenu
+  // sur le téléphone) ; le nombre de personnes se règle ici aussi, et la recette peut être retirée.
+  function carteRecette(recette) {
     const reglage = (ecart, libelle, classe) => el("button", {
       type: "button", class: classe, "aria-label": libelle,
       disabled: recette.personnes + ecart < PERSONNES_MIN || recette.personnes + ecart > PERSONNES_MAX,
       onclick: () => changer((liste) => ajouterALaListe(liste, recette.id, recette.personnes + ecart)),
     });
+    const restants = recette.articles.filter((article) => !article.coche).length;
+    const idIngredients = `courses-${recette.id}`;
     return el("li", { class: "carte courses__recette" },
-      el("a", { href: `#/recette/${encodeURIComponent(recette.id)}` }, el("strong", {}, recette.nom)),
+      el("button", {
+        type: "button", class: "courses__plier", "aria-expanded": String(!recette.plie), "aria-controls": idIngredients,
+        onclick: () => changer((liste) => plierRecette(liste, recette.id, !recette.plie)),
+      },
+      el("span", { class: "courses__chevron", "aria-hidden": "true" }),
+      el("strong", {}, recette.nom),
+      el("span", { class: "discret courses__compte" },
+        restants ? `${restants} / ${recette.articles.length}` : "✓ Tout acheté")),
       el("div", { class: "portions" },
         recette.personnes
           ? [reglage(-1, "Une personne de moins", "portions__bouton"),
             el("output", { class: "portions__valeur" }, nombrePersonnes(recette.personnes)),
             reglage(1, "Une personne de plus", "portions__bouton portions__bouton--plus")]
-          : el("span", { class: "discret" }, "Quantités de la recette (nombre de personnes non indiqué)"),
-        el("button", {
-          type: "button", class: "bouton bouton--secondaire bouton--petit courses__retirer",
-          onclick: () => changer((liste) => retirerDeLaListe(liste, recette.id)),
-        }, "✕ Retirer")));
+          : el("span", { class: "discret" }, "Nombre de personnes non indiqué"),
+        el("span", { class: "courses__liens" },
+          el("a", { href: `#/recette/${encodeURIComponent(recette.id)}`, class: "bouton bouton--secondaire bouton--petit" }, "Voir"),
+          el("button", {
+            type: "button", class: "bouton bouton--secondaire bouton--petit", "aria-label": `Retirer ${recette.nom} de la liste`,
+            title: "Retirer de la liste",
+            onclick: () => changer((liste) => retirerDeLaListe(liste, recette.id)),
+          }, "✕"))),
+      el("div", { id: idIngredients, hidden: recette.plie },
+        recette.articles.length ? articles(recette.articles) : el("p", { class: "discret" }, "Aucun ingrédient.")));
   }
 
   async function rafraichir() {
@@ -834,17 +849,14 @@ async function vueCourses() {
         el("a", { href: "#/", class: "bouton" }, "Voir mes recettes")));
       return;
     }
-    const restants = construite.articles.filter((article) => !article.coche).length;
+    const tous = construite.recettes.flatMap((recette) => recette.articles);
+    const restants = tous.filter((article) => !article.coche).length;
     contenu.replaceChildren(
-      el("p", { class: "discret" }, construite.articles.length
-        ? `${restants} article${restants > 1 ? "s" : ""} à acheter sur ${construite.articles.length}`
-        : "Aucun ingrédient chiffré dans ces recettes."),
+      el("p", { class: "discret" },
+        `${nombreRecettes(construite.recettes.length)} · ${restants} article${restants > 1 ? "s" : ""} à acheter sur ${tous.length}`),
       el("div", { class: "barre-actions" }, boutonPartager, boutonVider),
       message,
-      ...(construite.articles.length ? [articles(construite.articles)] : []),
-      ...(construite.placards.length ? [el("h3", {}, "À vérifier dans les placards"), articles(construite.placards)] : []),
-      el("h3", {}, `Recettes (${construite.recettes.length})`),
-      el("ul", { class: "liste-recettes" }, construite.recettes.map(ligneRecette)),
+      el("ul", { class: "liste-recettes" }, construite.recettes.map(carteRecette)),
       ...(construite.introuvables.length === 0 ? [] : [el("div", { class: "carte" },
         el("p", {}, `${construite.introuvables.length} recette(s) de la liste ne sont plus dans le dépôt.`),
         el("button", {
