@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.13.1";
+const VERSION = "0.14.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -150,10 +150,41 @@ function listeRecettes(entrees, selection = null) {
 }
 
 // Liste rangée en sections (catégorie, cuisine, chef, statut…).
-function listeGroupee(groupes, selection = null) {
-  return groupes.map((groupe) => el("section", { class: "groupe" },
-    el("h3", { class: "groupe__titre" }, groupe.titre, el("span", { class: "discret" }, ` · ${groupe.entrees.length}`)),
-    cartesRecettes(groupe.entrees, undefined, selection)));
+// pliage : { estPlie(cle), basculer(cle) } ; un appui sur le titre d'une section plie ou déplie ses recettes.
+function listeGroupee(groupes, selection = null, pliage = null) {
+  return groupes.map((groupe) => {
+    const cle = groupe.cle ?? "";
+    const plie = pliage?.estPlie(cle) ?? false;
+    const titre = [groupe.titre, el("span", { class: "discret" }, ` · ${groupe.entrees.length}`)];
+    return el("section", { class: "groupe" },
+      el("h3", { class: "groupe__titre" }, pliage
+        ? el("button", {
+          type: "button", class: "groupe__plier", "aria-expanded": String(!plie),
+          onclick: () => pliage.basculer(cle),
+        }, el("span", { class: "chevron", "aria-hidden": "true" }), ...titre)
+        : titre),
+      el("div", { hidden: plie }, cartesRecettes(groupe.entrees, undefined, selection)));
+  });
+}
+
+// Sections pliées, par critère de classement : retenues sur ce téléphone (simple confort).
+const CLE_PLIS = "cuicui.sectionsPliees";
+
+function lirePlis() {
+  try {
+    const plis = JSON.parse(localStorage.getItem(CLE_PLIS));
+    return plis && typeof plis === "object" ? plis : {};
+  } catch {
+    return {};
+  }
+}
+
+function retenirPlis(plis) {
+  try {
+    localStorage.setItem(CLE_PLIS, JSON.stringify(plis));
+  } catch {
+    // Stockage indisponible : le pliage vaut pour cette visite.
+  }
 }
 
 // Mode sélection : cocher plusieurs recettes, puis les ajouter d'un coup à la liste de courses,
@@ -280,6 +311,7 @@ async function vueRecettes() {
   const barreClassement = el("div", { class: "classement" },
     el("label", { for: "classement" }, "Classer par"), choix, selection.boutonSelectionner);
   const compteur = el("span", { class: "discret" });
+  const plis = lirePlis();
 
   async function rafraichir() {
     const [entrees, livres, statut] = await Promise.all([stockage.lireRecettes(), stockage.lireLivres(), synchro.lireEtat()]);
@@ -300,7 +332,28 @@ async function vueRecettes() {
     if (critere === "nom") liste.replaceChildren(...listeRecettes(entrees, selection));
     // En mode sélection, l'étagère laisse place aux recettes rangées par livre.
     else if (critere === "livre" && !selection.active()) liste.replaceChildren(etagere(entrees, livres));
-    else liste.replaceChildren(...listeGroupee(classerRecettes(entrees, critere, titresLivres), selection));
+    else {
+      const groupes = classerRecettes(entrees, critere, titresLivres);
+      const cles = groupes.map((groupe) => groupe.cle ?? "");
+      const plies = new Set(plis[critere] ?? []);
+      const changerPlis = (nouveaux) => {
+        plis[critere] = [...nouveaux];
+        retenirPlis(plis);
+        rafraichir();
+      };
+      const pliage = {
+        estPlie: (cle) => plies.has(cle),
+        basculer: (cle) => changerPlis(plies.has(cle) ? [...plies].filter((autre) => autre !== cle) : [...plies, cle]),
+      };
+      const toutPlie = cles.every((cle) => plies.has(cle));
+      liste.replaceChildren(
+        el("div", { class: "groupes__actions" },
+          el("button", {
+            type: "button", class: "bouton bouton--secondaire bouton--petit",
+            onclick: () => changerPlis(toutPlie ? [] : cles),
+          }, toutPlie ? "Tout déplier" : "Tout plier")),
+        ...listeGroupee(groupes, selection, pliage));
+    }
   }
 
   await rafraichir();
@@ -858,7 +911,7 @@ async function vueCourses() {
         type: "button", class: "courses__plier", "aria-expanded": String(!recette.plie), "aria-controls": idIngredients,
         onclick: () => changer((liste) => plierRecette(liste, recette.id, !recette.plie)),
       },
-      el("span", { class: "courses__chevron", "aria-hidden": "true" }),
+      el("span", { class: "chevron", "aria-hidden": "true" }),
       el("strong", {}, recette.nom),
       el("span", { class: "discret courses__compte" },
         restants ? `${restants} / ${recette.articles.length}` : "✓ Tout acheté")),
@@ -997,7 +1050,7 @@ async function afficher() {
 function retrouverRecette(conteneur, id) {
   const lien = `#/recette/${encodeURIComponent(id)}`;
   const carte = [...conteneur.querySelectorAll("a.lien-recette")].find((a) => a.getAttribute("href") === lien);
-  if (!carte) return;
+  if (!carte || !carte.offsetParent) return; // absente, ou dans une section pliée
   const zone = conteneur.getBoundingClientRect();
   const hautVisible = conteneur.querySelector(".entete-vue")?.getBoundingClientRect().bottom ?? zone.top;
   const basVisible = document.querySelector(".navigation").getBoundingClientRect().top;
