@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.14.0";
+const VERSION = "0.14.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -122,7 +122,9 @@ function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
     const statut = infosStatut(lireStatut(entree.recette));
     const titre = el("span", { class: "lien-recette__titre" },
       el("strong", {}, nomRecette(entree)),
-      el("span", { class: "lien-recette__statut", title: statut.libelle, "aria-label": statut.libelle }, statut.icone));
+      el("span", { class: "lien-recette__icones" },
+        recettesDansLaListe.has(entree.id) && el("span", { title: "Dans la liste de courses", "aria-label": "Dans la liste de courses" }, "🛒"),
+        el("span", { title: statut.libelle, "aria-label": statut.libelle }, statut.icone)));
     if (selection?.active()) {
       const dejaLa = selection.dansLaListe(entree.id);
       return el("li", {},
@@ -470,8 +472,21 @@ const partager = (recette, message, personnes) => partagerTexte(String(recette.n
 // Rangée sur le téléphone seulement (magasin « meta ») : elle n'est jamais envoyée à GitHub.
 
 const CLE_LISTE_COURSES = "listeCourses";
-const lireListeCourses = async () => normaliserListe(await stockage.lireMeta(CLE_LISTE_COURSES));
-const ecrireListeCourses = (liste) => stockage.ecrireMeta(CLE_LISTE_COURSES, liste);
+// Recettes de la liste de courses : une icône 🛒 les signale dans les listes de recettes.
+// Tenu à jour à chaque lecture et écriture de la liste.
+let recettesDansLaListe = new Set();
+const retenirRecettesDeLaListe = (liste) => { recettesDansLaListe = new Set(liste.recettes.map((choix) => choix.id)); };
+
+async function lireListeCourses() {
+  const liste = normaliserListe(await stockage.lireMeta(CLE_LISTE_COURSES));
+  retenirRecettesDeLaListe(liste);
+  return liste;
+}
+
+function ecrireListeCourses(liste) {
+  retenirRecettesDeLaListe(liste);
+  return stockage.ecrireMeta(CLE_LISTE_COURSES, liste);
+}
 
 async function modifierListeCourses(changement) {
   const liste = changement(await lireListeCourses());
@@ -1021,6 +1036,7 @@ if (history.state?.profondeur == null) history.replaceState({ profondeur }, "");
 async function afficher() {
   const numero = ++numeroAffichage;
   const route = routeCourante();
+  await lireListeCourses(); // pour l'icône 🛒 des recettes déjà dans la liste
   const { contenu, rafraichir, quitter } = await chargerVue(route);
   if (numero !== numeroAffichage) return; // une autre page a été demandée entre-temps
 
@@ -1059,8 +1075,8 @@ function suivreHauteurEntete(conteneur) {
   observateurEntete.observe(entete);
 }
 
-// En revenant d'une recette : sa carte est mise en valeur un instant, et ramenée à l'écran
-// si elle n'y est pas (liste reclassée ou modifiée entre-temps).
+// En revenant d'une recette : sa carte est ramenée à l'écran si elle n'y est pas
+// (liste reclassée ou modifiée entre-temps).
 function retrouverRecette(conteneur, id) {
   const lien = `#/recette/${encodeURIComponent(id)}`;
   const carte = [...conteneur.querySelectorAll("a.lien-recette")].find((a) => a.getAttribute("href") === lien);
@@ -1070,8 +1086,6 @@ function retrouverRecette(conteneur, id) {
   const basVisible = document.querySelector(".navigation").getBoundingClientRect().top;
   const position = carte.getBoundingClientRect();
   if (position.top < hautVisible || position.bottom > basVisible) carte.scrollIntoView({ block: "center" });
-  carte.classList.add("lien-recette--recente");
-  carte.addEventListener("animationend", () => carte.classList.remove("lien-recette--recente"), { once: true });
 }
 
 // Bouton ← des en-têtes : revient à l'écran précédent (un livre, les Favoris…) comme le bouton
