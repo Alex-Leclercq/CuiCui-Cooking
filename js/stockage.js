@@ -1,11 +1,12 @@
 // CuiCui Cooking – stockage local dans le navigateur (IndexedDB).
-// Trois « magasins » :
+// Cinq « magasins » :
 // - recettes : copie locale des recettes { id, recette, sha } (sha = empreinte du fichier sur GitHub) ;
+// - livres   : copie locale des livres de recettes { id, livre, sha, fichiers } ;
 // - attente  : modifications pas encore envoyées à GitHub, une par recette ;
 // - meta     : réglages (dépôt, jeton) et état de la synchronisation ;
-// - photos   : photos téléchargées, rangées par empreinte (sha) pour rester disponibles hors ligne.
+// - photos   : photos et couvertures téléchargées, rangées par empreinte (sha) pour rester disponibles hors ligne.
 
-const VERSION_BASE = 2;
+const VERSION_BASE = 3;
 
 // siBloque : appelé si une autre fenêtre de l'application, restée sur une ancienne version,
 // empêche la mise à niveau de la base. L'ouverture reprend d'elle-même dès qu'elle est fermée.
@@ -22,6 +23,12 @@ export function ouvrirStockage(nom = "cuicui", { version = VERSION_BASE, siBloqu
       if (!existe("attente")) base.createObjectStore("attente", { keyPath: "id" });
       if (!existe("meta")) base.createObjectStore("meta");
       if (!existe("photos")) base.createObjectStore("photos");
+      if (!existe("livres")) {
+        base.createObjectStore("livres", { keyPath: "id" });
+        // Le dépôt peut déjà contenir des livres : on oublie le dernier commit synchronisé pour
+        // que la prochaine synchronisation relise l'arborescence (seuls les fichiers changés sont téléchargés).
+        demande.transaction.objectStore("meta").delete("dernierCommit");
+      }
     };
     demande.onsuccess = () => {
       const base = demande.result;
@@ -60,6 +67,12 @@ function creerStockage(base) {
     ecrireRecette: (entree) => ecrire("recettes", entree),
     supprimerRecette: (id) => supprimer("recettes", id),
     viderRecettes: () => vider("recettes"),
+
+    lireLivres: () => lireTout("livres"),
+    lireLivre: (id) => lire("livres", id),
+    ecrireLivre: (entree) => ecrire("livres", entree),
+    supprimerLivre: (id) => supprimer("livres", id),
+    viderLivres: () => vider("livres"),
 
     lireToutesAttentes: () => lireTout("attente"),
     lireAttente: (id) => lire("attente", id),

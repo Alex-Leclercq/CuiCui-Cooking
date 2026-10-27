@@ -6,11 +6,12 @@ import { ouvrirStockage } from "./stockage.js";
 import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
 import {
-  STATUTS, formaterIngredient, formaterInfos, formaterModification, formaterSource, grouperIngredients,
-  infosStatut, lireStatut, majuscule, modifier, recetteEnTexte, valeurActuelle,
+  CATEGORIES, CLASSEMENTS, STATUTS, classerRecettes, formaterIngredient, formaterInfos, formaterModification,
+  formaterSource, grouperIngredients, infosStatut, lireStatut, majuscule, modifier, recetteEnTexte, trierParPage,
+  valeurActuelle,
 } from "./recette.js";
 
-const VERSION = "0.7.0";
+const VERSION = "0.8.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -84,34 +85,106 @@ function boutonSynchroniser() {
 // Chaque vue renvoie { contenu, rafraichir? }. « rafraichir » met à jour la vue
 // quand la synchronisation change quelque chose, sans tout reconstruire.
 
-// Liste de recettes triées par nom, chacune menant à son écran de détail.
+const nomRecette = (entree) => String(entree.recette.nom ?? entree.id);
+const detailsParDefaut = ({ chef, source }) => [chef, source?.titre].filter(Boolean).join(" · ");
+const nombreRecettes = (nombre) => `${nombre} recette${nombre > 1 ? "s" : ""}`;
+
+// Recettes, dans l'ordre reçu, chacune menant à son écran de détail.
+// details : texte affiché sous le nom (par défaut « Chef · Livre »).
+function cartesRecettes(entrees, details = detailsParDefaut) {
+  return el("ul", { class: "liste-recettes" }, entrees.map((entree) => {
+    const texte = details(entree.recette);
+    const statut = infosStatut(lireStatut(entree.recette));
+    return el("li", {},
+      el("a", { class: "carte lien-recette", href: `#/recette/${encodeURIComponent(entree.id)}` },
+        el("span", { class: "lien-recette__titre" },
+          el("strong", {}, nomRecette(entree)),
+          el("span", { class: "lien-recette__statut", title: statut.libelle, "aria-label": statut.libelle }, statut.icone)),
+        texte && el("span", { class: "discret" }, texte)));
+  }));
+}
+
+// Liste de recettes triées par nom.
 function listeRecettes(entrees) {
-  const nom = (entree) => String(entree.recette.nom ?? entree.id);
-  const triees = [...entrees].sort((a, b) => nom(a).localeCompare(nom(b), "fr"));
-  return [
-    el("p", { class: "discret" }, `${triees.length} recette(s)`),
-    el("ul", { class: "liste-recettes" }, triees.map((entree) => {
-      const { chef, source } = entree.recette;
-      const details = [chef, source?.titre].filter(Boolean).join(" · ");
-      const statut = infosStatut(lireStatut(entree.recette));
-      return el("li", {},
-        el("a", { class: "carte lien-recette", href: `#/recette/${encodeURIComponent(entree.id)}` },
-          el("span", { class: "lien-recette__titre" },
-            el("strong", {}, nom(entree)),
-            el("span", { class: "lien-recette__statut", title: statut.libelle, "aria-label": statut.libelle }, statut.icone)),
-          details && el("span", { class: "discret" }, details)));
-    })),
-  ];
+  const [groupe] = classerRecettes(entrees, "nom");
+  return [el("p", { class: "discret" }, nombreRecettes(entrees.length)), cartesRecettes(groupe?.entrees ?? [])];
+}
+
+// Liste rangée en sections (catégorie, cuisine, chef, statut…).
+function listeGroupee(groupes) {
+  return groupes.map((groupe) => el("section", { class: "groupe" },
+    el("h3", { class: "groupe__titre" }, groupe.titre, el("span", { class: "discret" }, ` · ${groupe.entrees.length}`)),
+    cartesRecettes(groupe.entrees)));
+}
+
+// Couverture d'un livre : l'image dès qu'elle est disponible, sinon le titre sur fond coloré.
+function couvertureLivre(idLivre, titre) {
+  const cadre = el("div", { class: "couverture" }, el("span", { class: "couverture__titre" }, titre));
+  if (idLivre) {
+    synchro.couverture(idLivre).then((image) => {
+      if (!image) return;
+      cadre.replaceChildren(el("img", { src: URL.createObjectURL(image), alt: `Couverture : ${titre}` }));
+    });
+  }
+  return cadre;
+}
+
+// Étagère : un livre par couverture, avec son nombre de recettes ; les recettes sans livre à la fin.
+function etagere(entrees, livres) {
+  const groupes = classerRecettes(entrees, "livre", livres.map((entree) => ({ id: entree.id, titre: entree.livre?.titre })));
+  // Un livre du dépôt sans recette reste sur l'étagère.
+  for (const { id, livre } of livres) {
+    if (!groupes.some((groupe) => groupe.cle === id)) {
+      groupes.splice(groupes.length - (groupes.at(-1)?.cle === null ? 1 : 0), 0,
+        { cle: id, titre: livre?.titre ?? id, entrees: [] });
+    }
+  }
+  return el("ul", { class: "etagere" }, groupes.map((groupe) => el("li", {},
+    el("a", { class: "etagere__livre", href: `#/livre/${encodeURIComponent(groupe.cle ?? "")}` },
+      groupe.cle ? couvertureLivre(groupe.cle, groupe.titre)
+        : el("div", { class: "couverture couverture--vide" }, el("span", { class: "couverture__titre" }, "📖")),
+      el("strong", { class: "etagere__titre" }, groupe.titre),
+      el("span", { class: "discret" }, nombreRecettes(groupe.entrees.length))))));
+}
+
+// Critère de classement choisi : retenu sur ce téléphone (simple confort, sans importance s'il se perd).
+const CLE_CLASSEMENT = "cuicui.classement";
+
+function lireClassement() {
+  try {
+    const valeur = localStorage.getItem(CLE_CLASSEMENT);
+    return CLASSEMENTS.some((classement) => classement.valeur === valeur) ? valeur : "nom";
+  } catch {
+    return "nom";
+  }
+}
+
+function retenirClassement(valeur) {
+  try {
+    localStorage.setItem(CLE_CLASSEMENT, valeur);
+  } catch {
+    // Stockage indisponible (navigation privée…) : le choix vaut pour cette visite.
+  }
 }
 
 // La synchronisation est automatique : son état et son bouton sont dans les Réglages,
 // et le badge en haut de l'écran signale ce qui demande attention.
 async function vueRecettes() {
   const liste = el("div");
+  const choix = el("select", { class: "classement__choix", id: "classement" },
+    CLASSEMENTS.map((classement) => el("option", { value: classement.valeur }, classement.libelle)));
+  choix.value = lireClassement();
+  choix.addEventListener("change", () => {
+    retenirClassement(choix.value);
+    rafraichir();
+  });
+  const barreClassement = el("div", { class: "classement" },
+    el("label", { for: "classement" }, "Classer par"), choix);
 
   async function rafraichir() {
-    const [entrees, statut] = await Promise.all([stockage.lireRecettes(), synchro.lireEtat()]);
+    const [entrees, livres, statut] = await Promise.all([stockage.lireRecettes(), stockage.lireLivres(), synchro.lireEtat()]);
 
+    barreClassement.hidden = entrees.length === 0;
     if (entrees.length === 0) {
       liste.replaceChildren(statut.configure
         ? pageVide("📖", "Aucune recette dans le dépôt.",
@@ -121,14 +194,55 @@ async function vueRecettes() {
           el("a", { href: "#/reglages", class: "bouton" }, "Aller aux Réglages")));
       return;
     }
-    liste.replaceChildren(...listeRecettes(entrees));
+    const critere = choix.value;
+    if (critere === "nom") liste.replaceChildren(...listeRecettes(entrees));
+    else if (critere === "livre") liste.replaceChildren(etagere(entrees, livres));
+    else liste.replaceChildren(el("p", { class: "discret" }, nombreRecettes(entrees.length)),
+      ...listeGroupee(classerRecettes(entrees, critere)));
   }
 
   await rafraichir();
   return {
-    contenu: page("Mes recettes", liste),
+    contenu: page("Mes recettes", barreClassement, liste),
     rafraichir,
   };
+}
+
+// Un livre : sa couverture, ses informations et ses recettes dans l'ordre des pages.
+// idLivre vide : les recettes qui ne viennent d'aucun livre connu.
+async function vueLivre(idLivre) {
+  const contenu = el("div");
+
+  async function rafraichir() {
+    const [entrees, entreeLivre] = await Promise.all([stockage.lireRecettes(), idLivre ? stockage.lireLivre(idLivre) : null]);
+    const recettes = entrees.filter((entree) => (entree.recette.source?.livre || "") === idLivre);
+    const livre = entreeLivre?.livre ?? {};
+    const titre = idLivre ? livre.titre ?? recettes[0]?.recette.source?.titre ?? idLivre : "Sans livre";
+
+    if (idLivre && !entreeLivre && recettes.length === 0) {
+      contenu.replaceChildren(
+        el("a", { href: "#/", class: "retour" }, "← Mes recettes"),
+        pageVide("🤔", "Ce livre n'existe pas ou plus.", "Il a peut-être été supprimé du dépôt."));
+      return;
+    }
+    const publication = [livre.editeur, livre.annee].filter(Boolean).join(", ");
+    contenu.replaceChildren(
+      el("a", { href: "#/", class: "retour" }, "← Mes recettes"),
+      el("div", { class: "livre" },
+        idLivre ? couvertureLivre(idLivre, titre) : null,
+        el("div", { class: "livre__infos" },
+          el("h2", {}, titre),
+          livre.sousTitre && el("p", {}, livre.sousTitre),
+          livre.auteur && el("p", {}, el("strong", {}, livre.auteur)),
+          publication && el("p", { class: "discret" }, publication),
+          el("p", { class: "discret" }, nombreRecettes(recettes.length)))),
+      idLivre
+        ? cartesRecettes(trierParPage(recettes), ({ source }) => (source?.page ? `p. ${source.page}` : ""))
+        : cartesRecettes(classerRecettes(recettes, "nom")[0]?.entrees ?? []));
+  }
+
+  await rafraichir();
+  return { contenu, rafraichir };
 }
 
 // Onglets « Favoris » et « À essayer » : les recettes d'un statut donné.
@@ -143,11 +257,6 @@ function vueStatut(statut, titre, vide) {
     return { contenu: page(titre, liste), rafraichir };
   };
 }
-
-const CATEGORIES = {
-  aperitif: "Apéritif", entree: "Entrée", plat: "Plat", accompagnement: "Accompagnement",
-  dessert: "Dessert", boisson: "Boisson", sauce: "Sauce", autre: "Autre",
-};
 
 // N'accepte que les liens web : une adresse « javascript: » venue d'une recette serait dangereuse.
 function lienWeb(adresse) {
@@ -263,6 +372,8 @@ async function vueRecette(id) {
       el("h2", {}, String(recette.nom ?? id)),
       photoPlat,
       source && el("p", { class: "discret" }, source),
+      recette.source?.livre && el("p", {},
+        el("a", { href: `#/livre/${encodeURIComponent(recette.source.livre)}` }, "📚 Toutes les recettes du livre")),
       lienSource && el("p", {}, el("a", { href: lienSource, target: "_blank", rel: "noopener noreferrer" }, "Voir la recette en ligne")),
       infos && el("p", { class: "recette__infos" }, infos),
       (categorie || etiquettes.length > 0) && el("ul", { class: "etiquettes" },
@@ -453,22 +564,27 @@ let rafraichirVue = null;
 let numeroAffichage = 0;
 
 const PREFIXE_RECETTE = "/recette/";
+const PREFIXE_LIVRE = "/livre/";
+const estDetail = (route) => route.startsWith(PREFIXE_RECETTE) || route.startsWith(PREFIXE_LIVRE);
 
 function routeCourante() {
   const route = location.hash.replace(/^#/, "") || "/";
-  if (route.startsWith(PREFIXE_RECETTE)) return route;
+  if (estDetail(route)) return route;
   return route in vues ? route : "/";
 }
 
-function chargerVue(route) {
-  if (!route.startsWith(PREFIXE_RECETTE)) return vues[route]();
-  let id;
+function identifiant(route, prefixe) {
   try {
-    id = decodeURIComponent(route.slice(PREFIXE_RECETTE.length));
+    return decodeURIComponent(route.slice(prefixe.length));
   } catch {
-    id = "";
+    return "";
   }
-  return vueRecette(id);
+}
+
+function chargerVue(route) {
+  if (route.startsWith(PREFIXE_RECETTE)) return vueRecette(identifiant(route, PREFIXE_RECETTE));
+  if (route.startsWith(PREFIXE_LIVRE)) return vueLivre(identifiant(route, PREFIXE_LIVRE));
+  return vues[route]();
 }
 
 async function afficher() {
@@ -482,8 +598,8 @@ async function afficher() {
   conteneur.replaceChildren(contenu);
   conteneur.scrollTop = 0;
 
-  // Le détail d'une recette reste rattaché à l'onglet « Recettes ».
-  const onglet = route.startsWith(PREFIXE_RECETTE) ? "/" : route;
+  // Le détail d'une recette ou d'un livre reste rattaché à l'onglet « Recettes ».
+  const onglet = estDetail(route) ? "/" : route;
   for (const lien of document.querySelectorAll(".navigation a")) {
     if (lien.dataset.route === onglet) lien.setAttribute("aria-current", "page");
     else lien.removeAttribute("aria-current");

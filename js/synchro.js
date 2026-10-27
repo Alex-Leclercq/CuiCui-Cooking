@@ -8,6 +8,7 @@
 //   champ par champ ; si les deux côtés ont modifié le même champ, l'utilisateur choisit.
 
 const DOSSIER_RECETTE = /^recettes\/([^/]+)\/([^/]+)$/;
+const DOSSIER_LIVRE = /^livres\/([^/]+)\/([^/]+)$/;
 const cheminRecette = (id) => `recettes/${id}/recette.json`;
 const versTexte = (recette) => JSON.stringify(recette, null, 2) + "\n";
 const egal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -107,18 +108,29 @@ export function creerSynchro({ stockage, creerClient }) {
     const commit = await github.dernierCommit();
     if (commit === (await stockage.lireMeta("dernierCommit"))) return;
 
-    // Pour chaque recette : l'empreinte de recette.json et celles de ses autres fichiers (photos).
-    const distants = new Map();
-    for (const fichier of commit ? await github.arborescence(commit) : []) {
-      const correspondance = fichier.type === "blob" && fichier.path.match(DOSSIER_RECETTE);
+    const arbre = commit ? await github.arborescence(commit) : [];
+    await recevoirRecettes(github, parDossier(arbre, DOSSIER_RECETTE, "recette.json"));
+    await recevoirLivres(github, parDossier(arbre, DOSSIER_LIVRE, "livre.json"));
+    await stockage.ecrireMeta("dernierCommit", commit);
+  }
+
+  // Pour chaque dossier (recette ou livre) : l'empreinte de sa fiche et celles de ses autres fichiers (photos).
+  // Un dossier sans fiche est ignoré.
+  function parDossier(arbre, motif, fiche) {
+    const dossiers = new Map();
+    for (const fichier of arbre) {
+      const correspondance = fichier.type === "blob" && fichier.path.match(motif);
       if (!correspondance) continue;
       const [, id, nom] = correspondance;
-      if (!distants.has(id)) distants.set(id, { sha: null, fichiers: {} });
-      if (nom === "recette.json") distants.get(id).sha = fichier.sha;
-      else distants.get(id).fichiers[nom] = fichier.sha;
+      if (!dossiers.has(id)) dossiers.set(id, { sha: null, fichiers: {} });
+      if (nom === fiche) dossiers.get(id).sha = fichier.sha;
+      else dossiers.get(id).fichiers[nom] = fichier.sha;
     }
-    for (const [id, distant] of distants) if (!distant.sha) distants.delete(id);
+    for (const [id, dossier] of dossiers) if (!dossier.sha) dossiers.delete(id);
+    return dossiers;
+  }
 
+  async function recevoirRecettes(github, distants) {
     const locales = new Map((await stockage.lireRecettes()).map((entree) => [entree.id, entree]));
     const enAttente = new Set((await stockage.lireToutesAttentes()).map((operation) => operation.id));
 
@@ -140,11 +152,30 @@ export function creerSynchro({ stockage, creerClient }) {
     for (const id of locales.keys()) {
       if (!distants.has(id) && !enAttente.has(id)) await stockage.supprimerRecette(id);
     }
-    await stockage.ecrireMeta("dernierCommit", commit);
+  }
+
+  // Les livres ne sont modifiés que sur GitHub : la version distante remplace toujours la locale.
+  async function recevoirLivres(github, distants) {
+    const locaux = new Map((await stockage.lireLivres()).map((entree) => [entree.id, entree]));
+    for (const [id, { sha, fichiers }] of distants) {
+      const local = locaux.get(id);
+      if (local?.sha === sha) {
+        if (!egal(local.fichiers ?? {}, fichiers)) await stockage.ecrireLivre({ ...local, fichiers });
+        continue;
+      }
+      try {
+        await stockage.ecrireLivre({ id, livre: JSON.parse(await github.lireBlob(sha)), sha, fichiers });
+      } catch (erreur) {
+        if (!(erreur instanceof SyntaxError)) throw erreur;
+        console.warn(`Livre illisible ignoré : ${id}`);
+      }
+    }
+    for (const id of locaux.keys()) if (!distants.has(id)) await stockage.supprimerLivre(id);
   }
 
   // ---- Photos ----
-  // Les photos de plat sont préchargées après chaque synchronisation, pour s'afficher sans attente ;
+  // Les photos de plat et les couvertures de livres sont préchargées après chaque synchronisation,
+  // pour s'afficher sans attente ;
   // les autres (pages de livre) sont téléchargées à la première consultation.
   // Toutes restent ensuite sur le téléphone (hors ligne).
 
@@ -167,9 +198,21 @@ export function creerSynchro({ stockage, creerClient }) {
     return telechargements.get(sha);
   }
 
+  // Photo d'une recette (« plat.jpg », « source-1.jpg »…), ou null.
   async function photo(id, nom) {
     if (!nom) return null;
-    const sha = (await stockage.lireRecette(id))?.fichiers?.[nom];
+    return image((await stockage.lireRecette(id))?.fichiers?.[nom], nom);
+  }
+
+  // Couverture d'un livre, ou null.
+  async function couverture(idLivre) {
+    const entree = await stockage.lireLivre(idLivre);
+    const nom = entree?.livre?.couverture;
+    return nom ? image(entree.fichiers?.[nom], nom) : null;
+  }
+
+  // Image d'empreinte connue : depuis le téléphone, sinon depuis GitHub (puis gardée sur le téléphone).
+  async function image(sha, nom) {
     if (!sha) return null;
     const enCache = await stockage.lirePhoto(sha);
     if (enCache) return enCache;
@@ -182,22 +225,24 @@ export function creerSynchro({ stockage, creerClient }) {
     }
   }
 
-  // Photos de plat pas encore sur le téléphone : [{ sha, nom }], sans doublon.
-  async function photosDePlatManquantes() {
+  // Couvertures et photos de plat pas encore sur le téléphone : [{ sha, nom }], sans doublon.
+  // Les couvertures d'abord : elles s'affichent dès l'étagère.
+  async function imagesManquantes() {
     const presentes = new Set(await stockage.lireEmpreintesPhotos());
     const manquantes = new Map();
-    for (const { recette, fichiers } of await stockage.lireRecettes()) {
-      const nom = recette?.photos?.plat;
+    const ajouter = (nom, fichiers) => {
       const sha = nom && fichiers?.[nom];
       if (sha && !presentes.has(sha)) manquantes.set(sha, nom);
-    }
+    };
+    for (const { livre, fichiers } of await stockage.lireLivres()) ajouter(livre?.couverture, fichiers);
+    for (const { recette, fichiers } of await stockage.lireRecettes()) ajouter(recette?.photos?.plat, fichiers);
     return [...manquantes].map(([sha, nom]) => ({ sha, nom }));
   }
 
   async function passerPrechargement() {
     const github = await client();
     if (!github || globalThis.navigator?.connection?.saveData) return; // économiseur de données activé
-    const file = await photosDePlatManquantes();
+    const file = await imagesManquantes();
     // Quelques téléchargements en parallèle ; à la première erreur (hors ligne…), tout s'arrête.
     const telechargerLaFile = async () => {
       try {
@@ -274,6 +319,7 @@ export function creerSynchro({ stockage, creerClient }) {
   return {
     synchroniser,
     photo,
+    couverture,
     prechargerPhotos,
 
     ecouter(ecouteur) {
@@ -333,6 +379,7 @@ export function creerSynchro({ stockage, creerClient }) {
           throw new Error("Des modifications attendent encore d'être envoyées à l'ancien dépôt.");
         }
         await stockage.viderRecettes();
+        await stockage.viderLivres();
         await stockage.supprimerMeta("dernierCommit");
       }
       await stockage.ecrireMeta("config", config);
