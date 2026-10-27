@@ -845,7 +845,7 @@ body {
 .entete-vue {
   position: sticky;
   top: -16px;
-  z-index: 1;
+  z-index: 2; /* au-dessus des titres de section collés, qui glissent dessous */
   margin: -16px -16px 12px;
   padding: 16px 16px 4px;
   border-bottom: 1px solid var(--bordure);
@@ -958,18 +958,6 @@ body {
   color: #ffffff;
 }
 
-/* Recette qu'on vient de quitter : sa carte est entourée un instant dans la liste. */
-.lien-recette--recente {
-  animation: recette-recente 1.8s ease-out;
-}
-
-@keyframes recette-recente {
-  0%, 50% {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent);
-  }
-}
-
 /* Sections pliables : titres plus rapprochés, le bouton donne déjà la hauteur à toucher. */
 .groupe__titre:has(.groupe__plier) {
   margin: 4px 0;
@@ -989,4 +977,11 @@ body {
   margin-left: -16px;
   padding: 0 16px;
   background: var(--fond);
+}
+
+/* Icônes à droite du nom d'une recette : 🛒 si elle est dans la liste de courses, puis son statut. */
+.lien-recette__icones {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
 }
