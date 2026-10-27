@@ -9,6 +9,7 @@ import { creerFauxGitHub } from "./faux-github.js";
 const NOM_BASE = "cuicui-tests";
 const chemin = (id) => `recettes/${id}/recette.json`;
 const recette = (id, champs = {}) => ({ id, nom: id, favori: false, aEssayer: true, ...champs });
+const recetteAvecPhotos = (id) => recette(id, { photos: { source: ["source-1.jpg"], plat: "plat.jpg" } });
 const texte = (objet) => JSON.stringify(objet, null, 2) + "\n";
 
 function verifier(condition, message) {
@@ -252,6 +253,69 @@ const tests = {
     const seconde = await synchro.photo("a", "plat.jpg");
     verifier(seconde && (await seconde.text()) === "IMAGE-A", "la photo doit rester disponible hors ligne");
     verifier(github.etat.appels.filter((a) => a.includes("/git/blobs/")).length === 1, github.etat.appels.join(" | "));
+  },
+
+  async "Photos : téléchargées brutes, sans passer par le base64"() {
+    const { synchro, github } = await environnement();
+    github.ecrire(chemin("a"), texte(recette("a")));
+    github.ecrire("recettes/a/plat.jpg", "IMAGE-É");
+    await synchro.synchroniser();
+    github.etat.appels.length = 0;
+    const image = await synchro.photo("a", "plat.jpg");
+    verifier(image && (await image.text()) === "IMAGE-É", "contenu incorrect");
+    verifier(github.etat.appels.some((a) => a.includes("/git/blobs/") && a.endsWith("(brut)")), github.etat.appels.join(" | "));
+  },
+
+  async "Préchargement : photos de plat téléchargées après la synchro, pas les pages du livre"() {
+    const { synchro, github } = await environnement();
+    github.ecrire(chemin("a"), texte(recetteAvecPhotos("a")));
+    github.ecrire("recettes/a/plat.jpg", "IMAGE-A");
+    github.ecrire("recettes/a/source-1.jpg", "PAGE-A");
+    github.ecrire(chemin("b"), texte(recette("b"))); // sans photo
+    await synchro.synchroniser();
+    await synchro.prechargerPhotos();
+    github.etat.horsLigne = true;
+    const plat = await synchro.photo("a", "plat.jpg");
+    verifier(plat && (await plat.text()) === "IMAGE-A", "la photo du plat doit être déjà sur le téléphone");
+    verifier((await synchro.photo("a", "source-1.jpg")) === null, "la page du livre ne doit pas être préchargée");
+  },
+
+  async "Préchargement : photo déjà sur le téléphone → pas retéléchargée"() {
+    const { synchro, github } = await environnement();
+    github.ecrire(chemin("a"), texte(recetteAvecPhotos("a")));
+    const sha = github.ecrire("recettes/a/plat.jpg", "IMAGE-A");
+    await synchro.synchroniser();
+    await synchro.prechargerPhotos();
+    github.ecrire(chemin("b"), texte(recette("b")));
+    await synchro.synchroniser();
+    await synchro.prechargerPhotos();
+    const telechargements = github.etat.appels.filter((a) => a.includes(`/git/blobs/${sha}`));
+    verifier(telechargements.length === 1, github.etat.appels.join(" | "));
+  },
+
+  async "Préchargement : photo ouverte pendant le préchargement → téléchargée une seule fois"() {
+    const { synchro, github } = await environnement();
+    github.ecrire(chemin("a"), texte(recetteAvecPhotos("a")));
+    const sha = github.ecrire("recettes/a/plat.jpg", "IMAGE-A");
+    await synchro.synchroniser(); // le préchargement démarre en arrière-plan
+    const [image] = await Promise.all([synchro.photo("a", "plat.jpg"), synchro.prechargerPhotos()]);
+    verifier(image && (await image.text()) === "IMAGE-A", "photo incorrecte");
+    const telechargements = github.etat.appels.filter((a) => a.includes(`/git/blobs/${sha}`));
+    verifier(telechargements.length === 1, github.etat.appels.join(" | "));
+  },
+
+  async "Préchargement : connexion coupée → sans erreur, repris à la synchro suivante"() {
+    const { synchro, github, stockage } = await environnement();
+    github.ecrire(chemin("a"), texte(recetteAvecPhotos("a")));
+    const sha = github.ecrire("recettes/a/plat.jpg", "IMAGE-A");
+    github.etat.photosEnPanne = true;
+    await synchro.synchroniser();
+    await synchro.prechargerPhotos(); // ne doit pas échouer
+    verifier(!(await stockage.lirePhoto(sha)), "la photo ne peut pas être là");
+    github.etat.photosEnPanne = false;
+    await synchro.synchroniser();
+    await synchro.prechargerPhotos();
+    verifier(await stockage.lirePhoto(sha), "la photo doit être téléchargée une fois la connexion revenue");
   },
 
   async "Photos : absente ou hors ligne au premier affichage → rien, sans erreur"() {

@@ -8,7 +8,8 @@ export function creerFauxGitHub() {
   const blobs = new Map();    // sha → texte
   let commit = null;
   let compteur = 0;
-  const etat = { horsLigne: false, appels: [] };
+  // photosEnPanne : seuls les téléchargements de photos échouent (connexion coupée en plein préchargement).
+  const etat = { horsLigne: false, photosEnPanne: false, appels: [] };
 
   const nouveauSha = () => `sha${++compteur}`;
 
@@ -34,7 +35,8 @@ export function creerFauxGitHub() {
     const methode = options.method ?? "GET";
     const adresse = new URL(url);
     const route = adresse.pathname.replace(/^\/repos\/[^/]+\/[^/]+/, "");
-    etat.appels.push(`${methode} ${route}`);
+    const brut = options.headers?.Accept === "application/vnd.github.raw+json";
+    etat.appels.push(`${methode} ${route}${brut ? " (brut)" : ""}`);
     let correspondance;
 
     if (route === "") return reponse(200, { full_name: "test/recettes", private: true });
@@ -49,7 +51,14 @@ export function creerFauxGitHub() {
     }
 
     if ((correspondance = route.match(/^\/git\/blobs\/(.+)$/))) {
-      return reponse(200, { content: versBase64(blobs.get(correspondance[1])), encoding: "base64" });
+      if (etat.photosEnPanne && brut) throw new TypeError("Failed to fetch");
+      const contenu = blobs.get(correspondance[1]);
+      if (brut) {
+        return new Response(new TextEncoder().encode(contenu), {
+          status: 200, headers: { "Content-Type": "application/octet-stream" },
+        });
+      }
+      return reponse(200, { content: versBase64(contenu), encoding: "base64" });
     }
 
     if ((correspondance = route.match(/^\/contents\/(.+)$/))) {

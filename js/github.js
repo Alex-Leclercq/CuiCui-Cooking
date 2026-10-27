@@ -49,14 +49,15 @@ const encoderChemin = (chemin) => chemin.split("/").map(encodeURIComponent).join
 export function creerClientGitHub({ proprietaire, depot, jeton, fetch: appeler = (...a) => fetch(...a) }) {
   const racine = `${API}/repos/${encodeURIComponent(proprietaire)}/${encodeURIComponent(depot)}`;
 
-  async function requete(chemin, { methode = "GET", corps } = {}) {
+  // brut : renvoie le contenu binaire du fichier (ArrayBuffer) au lieu d'une réponse JSON en base64.
+  async function requete(chemin, { methode = "GET", corps, brut = false } = {}) {
     let reponse;
     try {
       reponse = await appeler(racine + chemin, {
         method: methode,
         cache: "no-store",
         headers: {
-          Accept: "application/vnd.github+json",
+          Accept: brut ? "application/vnd.github.raw+json" : "application/vnd.github+json",
           Authorization: `Bearer ${jeton}`,
           "X-GitHub-Api-Version": "2022-11-28",
           ...(corps ? { "Content-Type": "application/json" } : {}),
@@ -67,7 +68,7 @@ export function creerClientGitHub({ proprietaire, depot, jeton, fetch: appeler =
       throw new ErreurGitHub("Pas de connexion à GitHub.", 0);
     }
     if (!reponse.ok) throw new ErreurGitHub(messageErreur(reponse.status), reponse.status);
-    return reponse.json();
+    return brut ? reponse.arrayBuffer() : reponse.json();
   }
 
   return {
@@ -98,9 +99,9 @@ export function creerClientGitHub({ proprietaire, depot, jeton, fetch: appeler =
     },
 
     // Contenu binaire d'un fichier (photo) à partir de son empreinte.
+    // Demandé brut plutôt qu'en base64 : moins de données à recevoir et rien à décoder.
     async lireBlobBinaire(sha) {
-      const binaire = atob((await requete(`/git/blobs/${sha}`)).content.replace(/\s/g, ""));
-      return Uint8Array.from(binaire, (caractere) => caractere.charCodeAt(0));
+      return new Uint8Array(await requete(`/git/blobs/${sha}`, { brut: true }));
     },
 
     // Contenu actuel d'un fichier, ou null s'il n'existe pas.

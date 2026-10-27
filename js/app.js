@@ -10,7 +10,7 @@ import {
   infosStatut, lireStatut, majuscule, modifier, recetteEnTexte, valeurActuelle,
 } from "./recette.js";
 
-const VERSION = "0.6.1";
+const VERSION = "0.7.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -407,6 +407,8 @@ async function vueReglages() {
 
   const horsLigne = el("p", { class: "discret" }, "Vérification du mode hors ligne…");
   afficherEtatHorsLigne(horsLigne);
+  const stockageProtege = el("p", { class: "discret" }, "Vérification de la protection des données…");
+  afficherEtatStockage(stockageProtege);
 
   return {
     contenu: page("Réglages",
@@ -417,7 +419,8 @@ async function vueReglages() {
       el("section", { class: "carte" },
         el("p", {}, el("strong", {}, "À propos")),
         el("p", { class: "discret" }, `CuiCui Cooking, version ${VERSION}.`),
-        horsLigne),
+        horsLigne,
+        stockageProtege),
       el("section", { class: "carte" },
         el("p", {}, el("strong", {}, "Historique des modifications")),
         el("p", { class: "discret" }, "Changements de statut et de notes sur toutes les recettes."),
@@ -500,6 +503,28 @@ async function afficherEtatHorsLigne(element) {
     : "Mode hors ligne en cours d'installation…";
 }
 
+// Demande au navigateur de ne pas effacer les recettes et les photos quand le téléphone
+// manque de place. Chrome l'accorde sans rien demander, notamment à une application installée.
+// Renvoie true (protégé), false (refusé) ou null (non pris en charge).
+async function protegerStockage() {
+  try {
+    if (!navigator.storage?.persist) return null;
+    return (await navigator.storage.persisted()) || (await navigator.storage.persist());
+  } catch {
+    return null;
+  }
+}
+
+async function afficherEtatStockage(element) {
+  const protege = await protegerStockage();
+  element.textContent = protege === null
+    ? "Protection des données non prise en charge par ce navigateur."
+    : protege
+      ? "Recettes et photos protégées : le téléphone ne les effacera pas pour faire de la place."
+      : "Recettes et photos non protégées : le téléphone pourrait les effacer s'il manque de place. "
+        + "Installer l'application sur l'écran d'accueil permet de les protéger.";
+}
+
 async function mettreAJourBadge() {
   const badge = document.getElementById("etat-synchro");
   const etat = await synchro.lireEtat();
@@ -573,4 +598,5 @@ afficher();
 suivreConnexion();
 mettreAJourBadge();
 enregistrerServiceWorker();
+protegerStockage();
 synchro.synchroniser().catch(() => {});
