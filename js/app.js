@@ -770,10 +770,11 @@ async function vueReglages() {
             onclick: () => revenir(entree.id, ligne),
           }, libelleRetour));
       })),
-      lignes.length > LIGNES_HISTORIQUE && el("button", {
+      // replaceChildren() écrirait « false » à l'écran : le bouton n'est passé que s'il existe.
+      ...(lignes.length > LIGNES_HISTORIQUE ? [el("button", {
         type: "button", class: "bouton bouton--secondaire bouton--petit",
         onclick: () => { toutAfficher = !toutAfficher; afficherHistoriqueGlobal(); },
-      }, toutAfficher ? "Afficher moins" : `Tout afficher (${lignes.length})`));
+      }, toutAfficher ? "Afficher moins" : `Tout afficher (${lignes.length})`)] : []));
   }
 
   async function revenir(id, ligne) {
