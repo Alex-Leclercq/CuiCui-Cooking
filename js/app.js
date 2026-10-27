@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.14.1";
+const VERSION = "0.14.2";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -305,9 +305,11 @@ async function vueRecettes() {
   const choix = el("select", { class: "classement__choix", id: "classement" },
     CLASSEMENTS.map((classement) => el("option", { value: classement.valeur }, classement.libelle)));
   choix.value = lireClassement();
-  choix.addEventListener("change", () => {
+  // Nouveau classement : la liste repart du haut (l'ancienne position n'a plus de sens).
+  choix.addEventListener("change", async () => {
     retenirClassement(choix.value);
-    rafraichir();
+    await rafraichir();
+    document.getElementById("vue").scrollTop = 0;
   });
   const selection = creerSelection(() => rafraichir());
   const barreClassement = el("div", { class: "classement" },
