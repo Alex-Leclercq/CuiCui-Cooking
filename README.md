@@ -23,10 +23,15 @@
 - **Classement :** chaque recette a une catégorie (entrée, plat, dessert…), une cuisine (française, japonaise…), une difficulté et des mots-clés libres (végétarien, rapide, hiver…), affichés sous forme de capsules. En haut de la liste, **Classer par** range les recettes par nom, catégorie, cuisine, chef ou statut (le choix est retenu sur le téléphone).
 - **Étagère des livres :** **Classer par → Livre** affiche les couvertures de mes livres de recettes, avec leur nombre de recettes. Un livre ouvre ses recettes dans l'ordre des pages, comme une table des matières. Depuis une recette, un lien mène à toutes les recettes du même livre.
 - **Partager une recette :** un bouton envoie la recette en texte (ingrédients, étapes, temps, source) par WhatsApp, SMS, e-mail… via le menu de partage du téléphone. Mes notes personnelles ne sont pas partagées.
-- **Liste de courses :** je sélectionne plusieurs recettes et l'application me donne une seule liste de courses qui regroupe tous les ingrédients nécessaires.
+- **Liste de courses (onglet 🛒 Courses) :**
+  - j'ajoute une recette avec **🛒 Ajouter à la liste**, pour le nombre de personnes affiché (si je change ce nombre ensuite, le bouton propose de **mettre à jour la liste**). Ou, dans Mes recettes, Favoris ou À essayer, **🛒 Sélectionner** me laisse cocher plusieurs recettes et les ajouter d'un coup, chacune pour son nombre de personnes d'origine ;
+  - les ingrédients identiques sont additionnés (200 g + 0,5 kg de farine = 700 g) et rangés par ordre alphabétique. En magasin, je touche un article pour le barrer : il descend en bas de la liste. S'il en faut davantage ensuite (recette ajoutée, personnes en plus), il redevient à acheter ;
+  - les ingrédients sans quantité (sel, poivre…) sont regroupés une seule fois dans **À vérifier dans les placards** ;
+  - sous la liste, chaque recette garde son réglage − / + et un bouton **✕ Retirer** ; **🗑️ Vider la liste** efface tout, après confirmation ;
+  - **📤 Partager** envoie en texte ce qui reste à acheter. La liste reste sur le téléphone : elle n'est pas envoyée à GitHub.
 - **En cuisine :**
   - j'ajuste le nombre de personnes (− / +) et les quantités sont recalculées, arrondies à ce qui se mesure en cuisine (œufs à l'entier, cuillères et pièces au ½ près, passage en kg ou en litres). Le réglage n'est jamais enregistré : la recette se rouvre toujours sur son nombre d'origine. Les recettes sans nombre de personnes (pâtes fraîches, bouillons, fonds) n'ont pas de réglage, et les quantités citées dans les étapes restent celles d'origine ;
-  - le bouton **🔆 Garder l'écran allumé** d'une recette empêche le téléphone de se mettre en veille pendant que je cuisine. Il s'arrête en quittant la recette ou en touchant à nouveau le bouton, et reprend tout seul si je reviens dans l'application après l'avoir quittée un instant. Il n'apparaît pas si le navigateur ne sait pas le faire (sur iPhone, il faut une version récente d'iOS).
+  - le bouton **🔆 Garder l'écran allumé** d'une recette empêche le téléphone de se mettre en veille pendant que je cuisine. Il s'arrête en quittant la recette ou en touchant à nouveau le bouton, et reprend tout seul si je reviens dans l'application après l'avoir quittée un instant. Il n'apparaît pas si le navigateur ne sait pas le faire.
 
 ## Deux façons d'importer une recette
 
@@ -98,7 +103,8 @@ Recommandations pour le compte GitHub : activer la **double authentification (2F
 | `js/github.js` | Les échanges avec l'API GitHub (lecture et écriture des fichiers). |
 | `js/synchro.js` | La synchronisation : envoi, réception, fusion et conflits. |
 | `js/recette.js` | La mise en forme d'une recette en texte (quantités, durées, texte partagé). |
-| `tests/` | Les tests : synchronisation (avec un faux GitHub en mémoire) et mise en forme des recettes. |
+| `js/courses.js` | La liste de courses : addition des ingrédients, articles cochés, texte partagé. |
+| `tests/` | Les tests : synchronisation (avec un faux GitHub en mémoire), mise en forme des recettes et liste de courses. |
 | `sw.js` | Le « service worker » qui garde l'application en mémoire pour l'utiliser hors ligne. |
 | `manifest.webmanifest` | La carte d'identité de l'application (nom, icône, couleurs), qui permet de l'installer sur le téléphone. |
 | `icones/` | Les icônes de l'application. |
@@ -116,7 +122,8 @@ Puis ouvrir http://localhost:8080 dans le navigateur. `Ctrl+C` arrête le serveu
 
 Les tests s'ouvrent dans le navigateur :
 - synchronisation : http://localhost:8080/tests/test-synchro.html (faux GitHub en mémoire : aucun appel réseau, aucun jeton) ;
-- mise en forme des recettes : http://localhost:8080/tests/test-recette.html
+- mise en forme des recettes : http://localhost:8080/tests/test-recette.html ;
+- liste de courses : http://localhost:8080/tests/test-courses.html
 
 ## Installer sur le téléphone
 
@@ -146,6 +153,6 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [x] Ajuster les portions
 - [x] Garder l'écran allumé en cuisine
 - [x] Ajouter des notes personnelles
-- [ ] Générer une liste de courses à partir de plusieurs recettes
+- [x] Générer une liste de courses à partir de plusieurs recettes
 - [ ] Importer une recette à partir d'une photo (OCR)
 - [ ] Importer des recettes via Claude à partir de captures d'écran

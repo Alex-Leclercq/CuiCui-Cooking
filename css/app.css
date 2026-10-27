@@ -662,3 +662,89 @@ body {
   filter: none;
   opacity: 1;
 }
+
+/* Sélection de recettes pour la liste de courses */
+
+.lien-recette--choix {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.lien-recette--choix:has(input:checked:not(:disabled)) {
+  border-color: var(--accent);
+}
+
+.lien-recette--choix input,
+.courses__article input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.lien-recette__corps {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Reste visible au-dessus de la barre de navigation pendant qu'on fait défiler les recettes. */
+.barre-selection {
+  position: sticky;
+  bottom: calc(var(--hauteur-nav) + env(safe-area-inset-bottom) + 8px);
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+}
+
+.barre-selection .bouton:first-child {
+  flex: 1;
+}
+
+/* Liste de courses */
+
+.courses {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.courses__article {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--bordure);
+  cursor: pointer;
+}
+
+.courses__article--coche span {
+  color: var(--texte-doux);
+  text-decoration: line-through;
+}
+
+.courses__recette {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.courses__recette a {
+  color: inherit;
+}
+
+.courses__recette .portions {
+  margin: 0;
+}
+
+.courses__retirer {
+  margin-left: auto;
+}
