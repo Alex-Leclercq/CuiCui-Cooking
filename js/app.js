@@ -1034,6 +1034,7 @@ async function afficher() {
   routeAffichee = route;
 
   conteneur.replaceChildren(contenu);
+  suivreHauteurEntete(conteneur);
   conteneur.scrollTop = estRecette(route) ? 0 : positionsDefilement.get(route) ?? 0;
   if (recetteQuittee) retrouverRecette(conteneur, recetteQuittee);
 
@@ -1043,6 +1044,19 @@ async function afficher() {
     if (lien.dataset.route === onglet) lien.setAttribute("aria-current", "page");
     else lien.removeAttribute("aria-current");
   }
+}
+
+// Hauteur de l'en-tête figé de l'écran affiché, dans la variable CSS --hauteur-entete :
+// les titres de section (chef, catégorie…) se collent juste en dessous pendant le défilement.
+const observateurEntete = new ResizeObserver(([mesure]) =>
+  mesure.target.closest(".vue")?.style.setProperty("--hauteur-entete", `${mesure.target.offsetHeight}px`));
+
+function suivreHauteurEntete(conteneur) {
+  observateurEntete.disconnect();
+  const entete = conteneur.querySelector(".entete-vue");
+  if (!entete) return;
+  conteneur.style.setProperty("--hauteur-entete", `${entete.offsetHeight}px`); // tout de suite, puis à chaque changement
+  observateurEntete.observe(entete);
 }
 
 // En revenant d'une recette : sa carte est mise en valeur un instant, et ramenée à l'écran
