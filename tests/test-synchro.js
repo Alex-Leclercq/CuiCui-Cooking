@@ -329,6 +329,33 @@ const tests = {
     verifier((await synchro.photo("a", "plat.jpg")) === null, "hors ligne sans cache");
   },
 
+  async "Livres : fiche reçue, couverture préchargée et disponible hors ligne"() {
+    const { synchro, stockage, github } = await environnement();
+    github.ecrire("livres/mentor/livre.json", texte({ id: "mentor", titre: "Méthode Mentor", couverture: "couverture.jpg" }));
+    github.ecrire("livres/mentor/couverture.jpg", "COUVERTURE");
+    github.ecrire("livres/sans-fiche/couverture.jpg", "ORPHELINE"); // dossier sans livre.json : ignoré
+    await synchro.synchroniser();
+    await synchro.prechargerPhotos();
+    const livres = await stockage.lireLivres();
+    verifier(livres.length === 1 && livres[0].livre.titre === "Méthode Mentor", JSON.stringify(livres));
+    github.etat.horsLigne = true;
+    const image = await synchro.couverture("mentor");
+    verifier(image && (await image.text()) === "COUVERTURE", "la couverture doit être sur le téléphone");
+    verifier((await synchro.couverture("inconnu")) === null, "livre inconnu");
+  },
+
+  async "Livres : modifié puis supprimé sur le PC → mis à jour, puis supprimé du téléphone"() {
+    const { synchro, stockage, github } = await environnement();
+    github.ecrire("livres/mentor/livre.json", texte({ id: "mentor", titre: "Ancien titre" }));
+    await synchro.synchroniser();
+    github.ecrire("livres/mentor/livre.json", texte({ id: "mentor", titre: "Nouveau titre" }));
+    await synchro.synchroniser();
+    verifier((await stockage.lireLivre("mentor"))?.livre.titre === "Nouveau titre", "le titre doit être mis à jour");
+    github.supprimer("livres/mentor/livre.json");
+    await synchro.synchroniser();
+    verifier(!(await stockage.lireLivre("mentor")), "le livre doit être supprimé");
+  },
+
   async "Modifier une recette sur le téléphone garde la liste de ses photos"() {
     const { synchro, stockage, github } = await environnement();
     github.ecrire(chemin("a"), texte(recette("a")));
@@ -365,6 +392,31 @@ tests["Base bloquée par une autre fenêtre → signalée, puis ouverte une fois
   ancienne.close();
   const stockage = await ouverture;
   verifier(typeof stockage.lirePhoto === "function", "la base doit s'ouvrir une fois libérée");
+  stockage.fermer();
+  await new Promise((ok) => { const d = indexedDB.deleteDatabase(nom); d.onsuccess = d.onerror = d.onblocked = () => ok(); });
+};
+
+// Passage à la version 3 (livres) : le dernier commit est oublié pour relire l'arborescence,
+// sinon un téléphone déjà synchronisé ne recevrait les livres qu'au prochain commit.
+tests["Mise à niveau de la base (livres) → arborescence relue, recettes conservées"] = async () => {
+  stockageOuvert?.fermer();
+  const nom = "cuicui-tests-mise-a-niveau";
+  await new Promise((ok) => { const d = indexedDB.deleteDatabase(nom); d.onsuccess = d.onerror = d.onblocked = () => ok(); });
+  // Base en version 2, telle qu'elle existe sur les téléphones (sans magasin « livres »).
+  await new Promise((ok) => {
+    const d = indexedDB.open(nom, 2);
+    d.onupgradeneeded = () => {
+      for (const magasin of ["recettes", "attente"]) d.result.createObjectStore(magasin, { keyPath: "id" });
+      for (const magasin of ["meta", "photos"]) d.result.createObjectStore(magasin);
+      d.transaction.objectStore("meta").put("sha-commit", "dernierCommit");
+      d.transaction.objectStore("recettes").put({ id: "a", recette: recette("a"), sha: "sha-a" });
+    };
+    d.onsuccess = () => { d.result.close(); ok(); };
+  });
+  const stockage = await ouvrirStockage(nom);
+  verifier((await stockage.lireMeta("dernierCommit")) === undefined, "le dernier commit doit être oublié");
+  verifier((await stockage.lireRecette("a"))?.sha === "sha-a", "les recettes doivent être conservées");
+  verifier(Array.isArray(await stockage.lireLivres()), "le magasin des livres doit exister");
   stockage.fermer();
   await new Promise((ok) => { const d = indexedDB.deleteDatabase(nom); d.onsuccess = d.onerror = d.onblocked = () => ok(); });
 };

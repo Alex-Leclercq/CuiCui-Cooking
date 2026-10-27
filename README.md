@@ -20,7 +20,8 @@
 - **Mes notes :** sur l'écran d'une recette, j'écris mes remarques et je les enregistre.
 - **Photo du plat :** affichée en haut de la recette, sans attente : elle est téléchargée en arrière-plan dès la synchronisation, puis gardée sur le téléphone.
 - **Historique des modifications :** chaque changement de statut ou de notes est noté (date, recette, avant → après). Toutes les recettes sont regroupées dans **Réglages → Historique des modifications**. En cas de mauvaise manipulation, un bouton **↩ Revenir** restaure la valeur précédente.
-- **Classement :** chaque recette a une catégorie (entrée, plat, dessert…), une cuisine (française, japonaise…), une difficulté et des mots-clés libres (végétarien, rapide, hiver…), affichés sous forme de capsules.
+- **Classement :** chaque recette a une catégorie (entrée, plat, dessert…), une cuisine (française, japonaise…), une difficulté et des mots-clés libres (végétarien, rapide, hiver…), affichés sous forme de capsules. En haut de la liste, **Classer par** range les recettes par nom, catégorie, cuisine, chef ou statut (le choix est retenu sur le téléphone).
+- **Étagère des livres :** **Classer par → Livre** affiche les couvertures de mes livres de recettes, avec leur nombre de recettes. Un livre ouvre ses recettes dans l'ordre des pages, comme une table des matières. Depuis une recette, un lien mène à toutes les recettes du même livre.
 - **Partager une recette :** un bouton envoie la recette en texte (ingrédients, étapes, temps, source) par WhatsApp, SMS, e-mail… via le menu de partage du téléphone. Mes notes personnelles ne sont pas partagées.
 - **Liste de courses :** je sélectionne plusieurs recettes et l'application me donne une seule liste de courses qui regroupe tous les ingrédients nécessaires.
 - **En cuisine :**
@@ -42,7 +43,7 @@
 | Dépôt | Visibilité | Contenu |
 |---|---|---|
 | `CuiCui-Cooking` (celui-ci) | **Public** | Uniquement le code de l'application et sa documentation. Il est publié gratuitement sur GitHub Pages. Il ne contient aucune recette ni aucun secret. |
-| `CuiCui-Recettes` | **Privé** | Mes recettes : un dossier par recette dans `recettes/`, avec `recette.json` et les photos d'origine. |
+| `CuiCui-Recettes` | **Privé** | Mes recettes : un dossier par recette dans `recettes/`, avec `recette.json` et les photos d'origine ; un dossier par livre de recettes dans `livres/`, avec `livre.json` et la couverture. |
 
 Le format d'une fiche recette est décrit dans [docs/format-recette.md](docs/format-recette.md).
 
@@ -57,7 +58,7 @@ GitHub (le dépôt `CuiCui-Recettes`) est la référence. Le téléphone en gard
 ```
 
 - **Envoi depuis le téléphone :** chaque modification (nouvelle recette, changement de statut, note…) est d'abord enregistrée sur le téléphone (IndexedDB), puis envoyée aussitôt à GitHub par l'API REST : GitHub crée lui-même le commit. Sans réseau, la modification attend dans une file d'attente et part automatiquement au retour de la connexion.
-- **Réception sur le téléphone :** à chaque ouverture, à chaque retour sur l'application, ou avec le bouton **Réglages → Synchronisation → Synchroniser**, l'application compare l'empreinte (SHA) du dernier commit de `main` avec celle de la dernière synchronisation. Si elle a changé, elle récupère la liste des fichiers du dépôt avec leurs empreintes et ne télécharge que les recettes dont l'empreinte a changé. Les recettes supprimées sur GitHub disparaissent du téléphone. Les photos du plat qui manquent sur le téléphone sont ensuite téléchargées en arrière-plan (trois à la fois, en binaire plutôt qu'en base64, et pas du tout si l'économiseur de données est activé) ; les photos d'origine (pages de livre) ne le sont qu'à leur première consultation. Toutes restent ensuite sur le téléphone. L'application demande au navigateur de protéger ces données pour qu'Android ne les efface pas quand la place manque ; l'état de cette protection est affiché dans **Réglages → À propos**.
+- **Réception sur le téléphone :** à chaque ouverture, à chaque retour sur l'application, ou avec le bouton **Réglages → Synchronisation → Synchroniser**, l'application compare l'empreinte (SHA) du dernier commit de `main` avec celle de la dernière synchronisation. Si elle a changé, elle récupère la liste des fichiers du dépôt avec leurs empreintes et ne télécharge que les recettes dont l'empreinte a changé. Les recettes supprimées sur GitHub disparaissent du téléphone. Les fiches des livres (`livres/<id>/livre.json`) sont reçues de la même façon. Les couvertures et les photos du plat qui manquent sur le téléphone sont ensuite téléchargées en arrière-plan (trois à la fois, en binaire plutôt qu'en base64, et pas du tout si l'économiseur de données est activé) ; les photos d'origine (pages de livre) ne le sont qu'à leur première consultation. Toutes restent ensuite sur le téléphone. L'application demande au navigateur de protéger ces données pour qu'Android ne les efface pas quand la place manque ; l'état de cette protection est affiché dans **Réglages → À propos**.
 - **Où voir l'état :** la synchronisation est automatique et n'apparaît pas sur la page des recettes. En haut de l'écran, un badge signale les modifications en attente, un conflit ou une erreur (« ⚠️ Synchro ») ; un appui dessus ouvre les Réglages.
 - **Ajout depuis le PC :** Claude récupère d'abord la dernière version du dépôt (`git pull`), crée les fiches, puis pousse sur `main`. Les recettes arrivent sur le téléphone à sa prochaine synchronisation.
 - **Conflits :** chaque envoi indique la version du fichier connue par le téléphone. Si le fichier a changé entre-temps, GitHub refuse (erreur 409). L'application fusionne alors les changements ou me demande de choisir. Rien n'est écrasé en silence.
@@ -140,6 +141,7 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [ ] Ajouter et modifier une recette à la main
 - [x] Choisir le statut d'une recette (à essayer, déjà cuisinée, favorite) et afficher les onglets Favoris et À essayer
 - [x] Historique des modifications de statut et de notes, avec retour en arrière
+- [x] Classer les recettes (nom, livre, catégorie, cuisine, chef, statut) et étagère des livres
 - [ ] Rechercher et filtrer les recettes (catégorie, cuisine, difficulté, mots-clés, statut)
 - [ ] Ajuster les portions
 - [ ] Garder l'écran allumé en cuisine

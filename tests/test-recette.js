@@ -2,8 +2,8 @@
 // Ouvrir tests/test-recette.html avec le serveur local.
 
 import {
-  formaterDuree, formaterIngredient, formaterInfos, formaterModification, formaterSource, grouperIngredients,
-  lireStatut, majuscule, modifier, recetteEnTexte,
+  classerRecettes, formaterDuree, formaterIngredient, formaterInfos, formaterModification, formaterSource,
+  grouperIngredients, lireStatut, majuscule, modifier, recetteEnTexte, trierParPage,
 } from "../js/recette.js";
 
 function egal(obtenu, attendu) {
@@ -11,6 +11,8 @@ function egal(obtenu, attendu) {
 }
 
 const ingredient = (quantite, unite, nom, precision = null, groupe = null) => ({ quantite, unite, nom, precision, groupe });
+const entree = (id, champs) => ({ id, recette: { id, nom: id, ...champs } });
+const noms = (groupe) => groupe.entrees.map((e) => e.recette.nom).join(",");
 
 const exemple = {
   id: "recette-test-chef-test",
@@ -171,6 +173,57 @@ const tests = {
   "Texte partagé : lien de la source web inclus"() {
     const texte = recetteEnTexte({ nom: "Crêpes", source: { type: "site", titre: "Marmiton", url: "https://www.marmiton.org/crepes" }, ingredients: [], etapes: [] });
     if (!texte.includes("https://www.marmiton.org/crepes")) throw new Error("lien absent");
+  },
+
+  "Classer par nom : un seul groupe, trié par nom"() {
+    const groupes = classerRecettes([entree("b", { nom: "Œufs" }), entree("a", { nom: "Crêpes" }), entree("c", { nom: "abricot" })], "nom");
+    egal(groupes.length, 1);
+    egal(noms(groupes[0]), "abricot,Crêpes,Œufs");
+  },
+
+  "Classer par catégorie : ordre du repas, sans catégorie à la fin"() {
+    const groupes = classerRecettes([
+      entree("d", { categorie: "dessert" }), entree("p", { categorie: "plat" }),
+      entree("x", {}), entree("e", { categorie: "entree" }),
+    ], "categorie");
+    egal(groupes.map((g) => g.titre).join(","), "Entrée,Plat,Dessert,Sans catégorie");
+    egal(groupes.at(-1).cle, null);
+  },
+
+  "Classer par cuisine : majuscules et espaces ignorés, titres en majuscule"() {
+    const groupes = classerRecettes([
+      entree("a", { cuisine: "italienne" }), entree("b", { cuisine: " Italienne " }),
+      entree("c", { cuisine: "française" }), entree("d", { cuisine: "" }),
+    ], "cuisine");
+    egal(groupes.map((g) => `${g.titre}:${g.entrees.length}`).join(","), "Française:1,Italienne:2,Cuisine non précisée:1");
+  },
+
+  "Classer par chef : par ordre alphabétique"() {
+    const groupes = classerRecettes([entree("a", { chef: "Paul Bocuse" }), entree("b", { chef: "Cyril Lignac" }), entree("c", {})], "chef");
+    egal(groupes.map((g) => g.titre).join(","), "Cyril Lignac,Paul Bocuse,Sans chef");
+  },
+
+  "Classer par statut : à essayer, déjà cuisinée, favorite (anciens formats compris)"() {
+    const groupes = classerRecettes([
+      entree("a", { statut: "favorite" }), entree("b", { favori: true }), entree("c", {}), entree("d", { statut: "cuisinee" }),
+    ], "statut");
+    egal(groupes.map((g) => `${g.cle}:${g.entrees.length}`).join(","), "a-essayer:1,cuisinee:1,favorite:2");
+  },
+
+  "Classer par livre : titre de la fiche du livre, sinon celui de la recette"() {
+    const groupes = classerRecettes([
+      entree("a", { source: { titre: "Titre dans la recette", livre: "mentor" } }),
+      entree("b", { source: { titre: "Autre livre", livre: "autre" } }),
+      entree("c", { source: { type: "site", titre: "Marmiton" } }),
+    ], "livre", [{ id: "mentor", titre: "Méthode Mentor" }]);
+    egal(groupes.map((g) => `${g.cle}:${g.titre}`).join(","), "autre:Autre livre,mentor:Méthode Mentor,null:Sans livre");
+  },
+
+  "Recettes d'un livre : ordre des pages, sans page à la fin"() {
+    const triees = trierParPage([
+      entree("c", { source: { page: 268 } }), entree("x", { source: {} }), entree("a", { source: { page: 54 } }),
+    ]);
+    egal(triees.map((e) => e.id).join(","), "a,c,x");
   },
 };
 

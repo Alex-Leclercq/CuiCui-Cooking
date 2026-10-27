@@ -98,6 +98,7 @@ Lors d'une synchronisation, les lignes ajoutées sur le téléphone et sur GitHu
 | `titre` | Titre du livre ou nom du site. |
 | `url` | Adresse de la page, pour un site. |
 | `page` | Numéro de page, pour un livre. |
+| `livre` | Pour un livre : identifiant du livre, c'est-à-dire le nom de son dossier dans `livres/` (voir « Livres »). Sert à ranger la recette sur l'étagère. |
 
 ### Un ingrédient
 
@@ -112,6 +113,31 @@ Lors d'une synchronisation, les lignes ajoutées sur le téléphone et sur GitHu
 Unités autorisées : `g`, `kg`, `ml`, `cl`, `l`, `c. à café`, `c. à soupe`, `pincée`, `gousse`, `tranche`, `botte`, `brin`, `feuille`, `boîte`, `sachet`.
 
 Ces règles, avec des noms au singulier et des unités normalisées, permettent à l'application de recalculer les portions et d'additionner les ingrédients de plusieurs recettes pour la liste de courses (par exemple 200 g + 0,5 kg de farine = 700 g).
+
+## Livres
+
+Chaque livre de recettes a son dossier dans `livres/`, à côté de `recettes/`. Le nom du dossier est l'identifiant du livre : son titre, en minuscules, sans accents, avec des tirets. Les recettes tirées de ce livre l'indiquent dans `source.livre`.
+
+```
+livres/
+  cuisinez-bien-accompagne-avec-ma-methode-mentor/
+    livre.json        ← la fiche du livre
+    couverture.jpg    ← sa couverture (JPEG, environ 1600 px sur le plus grand côté)
+```
+
+| Champ | Type | Obligatoire | Description |
+|---|---|---|---|
+| `id` | texte | oui | Identique au nom du dossier. |
+| `titre` | texte | oui | Titre du livre. |
+| `sousTitre` | texte | non | Sous-titre, tel qu'écrit sur la couverture. |
+| `auteur` | texte | non | Auteur ou chef. |
+| `editeur` | texte | non | Maison d'édition. |
+| `annee` | nombre | non | Année de publication. |
+| `isbn` | texte | non | ISBN, sans tirets. |
+| `couverture` | texte | non | Nom du fichier de la couverture, ou `null`. |
+| `dateAjout` | texte | oui | Date au format `AAAA-MM-JJ`. |
+
+Une recette dont `source.livre` désigne un livre absent de `livres/` reste rangée sous ce livre, avec le titre de `source.titre` et sans couverture.
 
 ## Exemple
 

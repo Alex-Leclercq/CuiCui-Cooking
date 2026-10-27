@@ -20,6 +20,98 @@ export function lireStatut(recette) {
 
 export const infosStatut = (valeur) => STATUTS.find((statut) => statut.valeur === valeur);
 
+// Catégories, dans l'ordre d'un repas.
+export const CATEGORIES = {
+  aperitif: "Apéritif", entree: "Entrée", plat: "Plat", accompagnement: "Accompagnement",
+  dessert: "Dessert", boisson: "Boisson", sauce: "Sauce", autre: "Autre",
+};
+
+// Critères proposés pour classer la liste des recettes.
+export const CLASSEMENTS = [
+  { valeur: "nom", libelle: "Nom" },
+  { valeur: "livre", libelle: "Livre" },
+  { valeur: "categorie", libelle: "Catégorie" },
+  { valeur: "cuisine", libelle: "Cuisine" },
+  { valeur: "chef", libelle: "Chef" },
+  { valeur: "statut", libelle: "Statut" },
+];
+
+const nomRecette = (entree) => String(entree.recette.nom ?? entree.id);
+const parNom = (a, b) => nomRecette(a).localeCompare(nomRecette(b), "fr");
+const texteNettoye = (valeur) => (typeof valeur === "string" && valeur.trim() ? valeur.trim() : null);
+
+// Pour chaque critère : la clé et le titre du groupe d'une recette (ou null), le rang d'un groupe
+// (les groupes de même rang sont triés par titre) et le titre du groupe des recettes non classées.
+function criteres(livres) {
+  const titresLivres = new Map(livres.map((livre) => [livre.id, livre.titre]));
+  const ordreCategories = Object.keys(CATEGORIES);
+  const ordreStatuts = STATUTS.map((statut) => statut.valeur);
+  const rangDans = (ordre) => (cle) => (ordre.includes(cle) ? ordre.indexOf(cle) : ordre.length);
+  const texteLibre = (champ) => (recette) => {
+    const valeur = texteNettoye(recette[champ]);
+    return valeur && { cle: valeur.toLocaleLowerCase("fr"), titre: majuscule(valeur) };
+  };
+  return {
+    livre: {
+      groupe: (recette) => {
+        const id = texteNettoye(recette.source?.livre);
+        return id && { cle: id, titre: titresLivres.get(id) ?? texteNettoye(recette.source?.titre) ?? id };
+      },
+      sansGroupe: "Sans livre",
+    },
+    categorie: {
+      groupe: (recette) => {
+        const cle = texteNettoye(recette.categorie);
+        return cle && { cle, titre: CATEGORIES[cle] ?? majuscule(cle) };
+      },
+      rang: rangDans(ordreCategories),
+      sansGroupe: "Sans catégorie",
+    },
+    cuisine: { groupe: texteLibre("cuisine"), sansGroupe: "Cuisine non précisée" },
+    chef: { groupe: texteLibre("chef"), sansGroupe: "Sans chef" },
+    statut: {
+      groupe: (recette) => {
+        const statut = infosStatut(lireStatut(recette));
+        return { cle: statut.valeur, titre: `${statut.icone} ${statut.libelle}` };
+      },
+      rang: rangDans(ordreStatuts),
+    },
+  };
+}
+
+// Range des entrées { id, recette } selon un critère de CLASSEMENTS.
+// Renvoie [{ cle, titre, entrees }] : groupes dans l'ordre du critère, recettes non classées
+// en dernier (cle null), recettes triées par nom. « nom » donne un seul groupe sans titre.
+// livres : [{ id, titre }], pour afficher le titre des livres.
+export function classerRecettes(entrees, critere, livres = []) {
+  const definition = criteres(livres)[critere];
+  if (!definition) return entrees.length ? [{ cle: null, titre: null, entrees: [...entrees].sort(parNom) }] : [];
+
+  const groupes = new Map();
+  const sansGroupe = [];
+  for (const entree of entrees) {
+    const groupe = definition.groupe(entree.recette);
+    if (!groupe) {
+      sansGroupe.push(entree);
+      continue;
+    }
+    if (!groupes.has(groupe.cle)) groupes.set(groupe.cle, { cle: groupe.cle, titre: groupe.titre, entrees: [] });
+    groupes.get(groupe.cle).entrees.push(entree);
+  }
+  const rang = definition.rang ?? (() => 0);
+  const resultat = [...groupes.values()].sort((a, b) =>
+    rang(a.cle) - rang(b.cle) || a.titre.localeCompare(b.titre, "fr"));
+  if (sansGroupe.length) resultat.push({ cle: null, titre: definition.sansGroupe, entrees: sansGroupe });
+  for (const groupe of resultat) groupe.entrees.sort(parNom);
+  return resultat;
+}
+
+// Recettes d'un livre dans l'ordre du livre (numéro de page), celles sans page à la fin.
+export function trierParPage(entrees) {
+  const page = (entree) => (Number.isFinite(entree.recette.source?.page) ? entree.recette.source.page : Infinity);
+  return [...entrees].sort((a, b) => page(a) - page(b) || parNom(a, b));
+}
+
 // Valeur actuelle d'un champ suivi par l'historique.
 function valeurSuivie(recette, champ) {
   if (champ === "statut") return lireStatut(recette);

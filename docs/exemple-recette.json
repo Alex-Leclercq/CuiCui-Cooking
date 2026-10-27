@@ -6,7 +6,8 @@
     "type": "livre",
     "titre": "Mon livre de cuisine",
     "url": null,
-    "page": 42
+    "page": 42,
+    "livre": "mon-livre-de-cuisine"
   },
   "categorie": "plat",
   "cuisine": "française",
