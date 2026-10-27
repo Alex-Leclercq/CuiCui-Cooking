@@ -287,6 +287,40 @@ const tests = {
   },
 };
 
+// Base bloquée par une ancienne version ouverte ailleurs : signalée, puis reprise une fois libérée.
+tests["Base bloquée par une autre fenêtre → signalée, puis ouverte une fois libérée"] = async () => {
+  stockageOuvert?.fermer();
+  const nom = "cuicui-tests-blocage";
+  await new Promise((ok) => { const d = indexedDB.deleteDatabase(nom); d.onsuccess = d.onerror = d.onblocked = () => ok(); });
+  // « Ancienne version » : connexion en version 1 qui ne se ferme pas d'elle-même.
+  const ancienne = await new Promise((ok) => { const d = indexedDB.open(nom, 1); d.onsuccess = () => ok(d.result); });
+  let bloque = false;
+  const ouverture = ouvrirStockage(nom, { version: 2, siBloque: () => { bloque = true; } });
+  await new Promise((ok) => setTimeout(ok, 300));
+  verifier(bloque, "le blocage doit être signalé");
+  ancienne.close();
+  const stockage = await ouverture;
+  verifier(typeof stockage.lirePhoto === "function", "la base doit s'ouvrir une fois libérée");
+  stockage.fermer();
+  await new Promise((ok) => { const d = indexedDB.deleteDatabase(nom); d.onsuccess = d.onerror = d.onblocked = () => ok(); });
+};
+
+// Une version plus récente ouverte ailleurs : la connexion actuelle se libère d'elle-même.
+tests["Nouvelle version ouverte ailleurs → la base est libérée"] = async () => {
+  const nom = "cuicui-tests-liberation";
+  await new Promise((ok) => { const d = indexedDB.deleteDatabase(nom); d.onsuccess = d.onerror = d.onblocked = () => ok(); });
+  let prevenu = false;
+  await ouvrirStockage(nom, { version: 2, siNouvelleVersion: () => { prevenu = true; } });
+  const plusRecente = await new Promise((ok, ko) => {
+    const d = indexedDB.open(nom, 3);
+    const delai = setTimeout(() => ko(new Error("la nouvelle version est restée bloquée")), 2000);
+    d.onsuccess = () => { clearTimeout(delai); ok(d.result); };
+  });
+  verifier(prevenu, "l'application doit être prévenue");
+  plusRecente.close();
+  await new Promise((ok) => { const d = indexedDB.deleteDatabase(nom); d.onsuccess = d.onerror = d.onblocked = () => ok(); });
+};
+
 const lignes = [];
 let echecs = 0;
 for (const [nom, test] of Object.entries(tests)) {

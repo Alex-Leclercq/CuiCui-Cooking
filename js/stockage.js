@@ -7,9 +7,14 @@
 
 const VERSION_BASE = 2;
 
-export function ouvrirStockage(nom = "cuicui") {
+// siBloque : appelé si une autre fenêtre de l'application, restée sur une ancienne version,
+// empêche la mise à niveau de la base. L'ouverture reprend d'elle-même dès qu'elle est fermée.
+// siNouvelleVersion : appelé quand une version plus récente, ailleurs, a besoin de la base ;
+// la connexion est alors fermée pour ne pas la bloquer.
+export function ouvrirStockage(nom = "cuicui", { version = VERSION_BASE, siBloque, siNouvelleVersion } = {}) {
   return new Promise((resoudre, rejeter) => {
-    const demande = indexedDB.open(nom, VERSION_BASE);
+    const demande = indexedDB.open(nom, version);
+    demande.onblocked = () => siBloque?.();
     demande.onupgradeneeded = () => {
       const base = demande.result;
       const existe = (magasin) => base.objectStoreNames.contains(magasin);
@@ -18,7 +23,14 @@ export function ouvrirStockage(nom = "cuicui") {
       if (!existe("meta")) base.createObjectStore("meta");
       if (!existe("photos")) base.createObjectStore("photos");
     };
-    demande.onsuccess = () => resoudre(creerStockage(demande.result));
+    demande.onsuccess = () => {
+      const base = demande.result;
+      base.onversionchange = () => {
+        base.close();
+        siNouvelleVersion?.();
+      };
+      resoudre(creerStockage(base));
+    };
     demande.onerror = () => rejeter(demande.error);
   });
 }
