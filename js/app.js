@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.12.0";
+const VERSION = "0.13.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -48,6 +48,27 @@ function el(balise, attributs = {}, ...enfants) {
 }
 
 const page = (titre, ...contenu) => el("div", {}, el("h2", {}, titre), ...contenu);
+
+// En-tête figé en haut de l'écran pendant le défilement : la liste passe dessous.
+const enteteFige = (...contenu) => el("div", { class: "entete-vue" }, ...contenu);
+
+// Ligne de titre d'un en-tête figé, avec à droite un compteur discret (« 100 recettes »).
+const ligneTitre = (titre, compteur) =>
+  el("div", { class: "entete-vue__titre" }, el("h2", {}, titre), compteur);
+
+// Court message en bas de l'écran, visible même au milieu d'une page qu'on fait défiler.
+let minuterieNotification = null;
+function notifier(texte, type = "info") {
+  let bulle = document.querySelector(".notification");
+  if (!bulle) {
+    bulle = el("div", { class: "notification", role: "status" });
+    document.body.append(bulle);
+  }
+  bulle.textContent = texte;
+  bulle.className = `notification notification--${type} notification--visible`;
+  clearTimeout(minuterieNotification);
+  minuterieNotification = setTimeout(() => bulle.classList.remove("notification--visible"), 3000);
+}
 
 const pageVide = (icone, titre, explication, ...actions) =>
   el("div", { class: "vide" },
@@ -122,10 +143,10 @@ function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
   }));
 }
 
-// Liste de recettes triées par nom.
+// Liste de recettes triées par nom (le nombre de recettes est affiché dans l'en-tête figé).
 function listeRecettes(entrees, selection = null) {
   const [groupe] = classerRecettes(entrees, "nom");
-  return [el("p", { class: "discret" }, nombreRecettes(entrees.length)), cartesRecettes(groupe?.entrees ?? [], undefined, selection)];
+  return [cartesRecettes(groupe?.entrees ?? [], undefined, selection)];
 }
 
 // Liste rangée en sections (catégorie, cuisine, chef, statut…).
@@ -137,19 +158,21 @@ function listeGroupee(groupes, selection = null) {
 
 // Mode sélection : cocher plusieurs recettes, puis les ajouter d'un coup à la liste de courses,
 // chacune pour son nombre de personnes d'origine. reafficher : redessine la liste des recettes.
+// Pendant la sélection, la barre « Annuler / Ajouter » prend la place de la barre de navigation.
 function creerSelection(reafficher) {
   let active = false;
   const choisies = new Set();
   let dejaDansLaListe = new Set();
   const message = el("p", { class: "message", role: "status" });
   const boutonSelectionner = el("button", { type: "button", class: "bouton bouton--secondaire bouton--petit" }, "🛒 Sélectionner");
-  const boutonAjouter = el("button", { type: "button", class: "bouton" });
+  const boutonAjouter = el("button", { type: "button", class: "bouton barre-selection__ajouter" });
   const boutonAnnuler = el("button", { type: "button", class: "bouton bouton--secondaire" }, "Annuler");
-  const barre = el("div", { class: "barre-selection", hidden: true }, boutonAjouter, boutonAnnuler);
+  const barre = el("div", { class: "barre-selection", hidden: true }, boutonAnnuler, boutonAjouter);
 
   function afficherBarre() {
     boutonSelectionner.hidden = active;
     barre.hidden = !active;
+    document.body.classList.toggle("selection-en-cours", active);
     boutonAjouter.disabled = choisies.size === 0;
     boutonAjouter.textContent = choisies.size ? `🛒 Ajouter ${nombreRecettes(choisies.size)}` : "Cochez des recettes";
   }
@@ -180,6 +203,8 @@ function creerSelection(reafficher) {
   return {
     boutonSelectionner, barre, message,
     active: () => active,
+    // En quittant l'écran : la barre de navigation revient.
+    quitter: () => document.body.classList.remove("selection-en-cours"),
     choisie: (id) => choisies.has(id),
     dansLaListe: (id) => dejaDansLaListe.has(id),
     basculer(id, coche) {
@@ -254,11 +279,13 @@ async function vueRecettes() {
   const selection = creerSelection(() => rafraichir());
   const barreClassement = el("div", { class: "classement" },
     el("label", { for: "classement" }, "Classer par"), choix, selection.boutonSelectionner);
+  const compteur = el("span", { class: "discret" });
 
   async function rafraichir() {
     const [entrees, livres, statut] = await Promise.all([stockage.lireRecettes(), stockage.lireLivres(), synchro.lireEtat()]);
 
     barreClassement.hidden = entrees.length === 0;
+    compteur.textContent = entrees.length ? nombreRecettes(entrees.length) : "";
     if (entrees.length === 0) {
       liste.replaceChildren(statut.configure
         ? pageVide("📖", "Aucune recette dans le dépôt.",
@@ -273,14 +300,16 @@ async function vueRecettes() {
     if (critere === "nom") liste.replaceChildren(...listeRecettes(entrees, selection));
     // En mode sélection, l'étagère laisse place aux recettes rangées par livre.
     else if (critere === "livre" && !selection.active()) liste.replaceChildren(etagere(entrees, livres));
-    else liste.replaceChildren(el("p", { class: "discret" }, nombreRecettes(entrees.length)),
-      ...listeGroupee(classerRecettes(entrees, critere, titresLivres), selection));
+    else liste.replaceChildren(...listeGroupee(classerRecettes(entrees, critere, titresLivres), selection));
   }
 
   await rafraichir();
   return {
-    contenu: page("Mes recettes", barreClassement, selection.message, liste, selection.barre),
+    contenu: el("div", {},
+      enteteFige(ligneTitre("Mes recettes", compteur), barreClassement),
+      selection.message, liste, selection.barre),
     rafraichir,
+    quitter: selection.quitter,
   };
 }
 
@@ -288,6 +317,10 @@ async function vueRecettes() {
 // idLivre vide : les recettes qui ne viennent d'aucun livre connu.
 async function vueLivre(idLivre) {
   const contenu = el("div");
+  // En-tête figé compact : retour et titre du livre ; la couverture défile avec la liste.
+  const nomFige = el("strong", { class: "entete-vue__nom" });
+  const entete = enteteFige(el("div", { class: "entete-vue__barre" },
+    el("a", { href: "#/", class: "entete-vue__retour", "aria-label": "Retour à mes recettes" }, "←"), nomFige));
 
   async function rafraichir() {
     const [entrees, entreeLivre] = await Promise.all([stockage.lireRecettes(), idLivre ? stockage.lireLivre(idLivre) : null]);
@@ -296,14 +329,13 @@ async function vueLivre(idLivre) {
     const titre = idLivre ? livre.titre ?? recettes[0]?.recette.source?.titre ?? idLivre : "Sans livre";
 
     if (idLivre && !entreeLivre && recettes.length === 0) {
-      contenu.replaceChildren(
-        el("a", { href: "#/", class: "retour" }, "← Mes recettes"),
-        pageVide("🤔", "Ce livre n'existe pas ou plus.", "Il a peut-être été supprimé du dépôt."));
+      nomFige.textContent = "";
+      contenu.replaceChildren(pageVide("🤔", "Ce livre n'existe pas ou plus.", "Il a peut-être été supprimé du dépôt."));
       return;
     }
+    nomFige.textContent = titre;
     const publication = [livre.editeur, livre.annee].filter(Boolean).join(", ");
     contenu.replaceChildren(
-      el("a", { href: "#/", class: "retour" }, "← Mes recettes"),
       el("div", { class: "livre" },
         idLivre ? couvertureLivre(idLivre, titre) : null,
         el("div", { class: "livre__infos" },
@@ -318,7 +350,7 @@ async function vueLivre(idLivre) {
   }
 
   await rafraichir();
-  return { contenu, rafraichir };
+  return { contenu: el("div", {}, entete, contenu), rafraichir };
 }
 
 // Onglets « Favoris » et « À essayer » : les recettes d'un statut donné.
@@ -326,14 +358,22 @@ function vueStatut(statut, titre, vide) {
   return async () => {
     const liste = el("div");
     const selection = creerSelection(() => rafraichir());
+    const compteur = el("span", { class: "discret" });
     const barreSelection = el("div", { class: "classement" }, selection.boutonSelectionner);
     async function rafraichir() {
       const entrees = (await stockage.lireRecettes()).filter((entree) => lireStatut(entree.recette) === statut);
       barreSelection.hidden = entrees.length === 0;
+      compteur.textContent = entrees.length ? nombreRecettes(entrees.length) : "";
       liste.replaceChildren(...(entrees.length ? listeRecettes(entrees, selection) : [vide()]));
     }
     await rafraichir();
-    return { contenu: page(titre, barreSelection, selection.message, liste, selection.barre), rafraichir };
+    return {
+      contenu: el("div", {},
+        enteteFige(ligneTitre(titre, compteur), barreSelection),
+        selection.message, liste, selection.barre),
+      rafraichir,
+      quitter: selection.quitter,
+    };
   };
 }
 
@@ -436,20 +476,16 @@ async function vueRecette(id) {
     photoPlat.hidden = false;
   });
 
-  // Choix du statut : un appui suffit.
-  const choixStatut = el("div", { class: "statuts", role: "radiogroup", "aria-label": "Statut de la recette" },
-    STATUTS.map((statut) => el("button", {
-      type: "button", class: "statut", role: "radio", "data-valeur": statut.valeur,
-    }, `${statut.icone} ${statut.libelle}`)));
+  // Choix du statut : une pastille en haut à droite qui ouvre la liste de choix du téléphone.
+  // Deux gestes volontaires pour changer de statut : pas de changement par un appui accidentel.
+  const listeStatuts = el("select", { class: "statut-choix__liste", "aria-label": "Statut de la recette" },
+    STATUTS.map((statut) => el("option", { value: statut.valeur }, `${statut.icone} ${statut.libelle}`)));
+  const choixStatut = el("label", { class: "statut-choix" }, listeStatuts,
+    el("span", { class: "statut-choix__chevron", "aria-hidden": "true" }));
   function afficherStatut() {
-    for (const bouton of choixStatut.querySelectorAll(".statut")) {
-      bouton.setAttribute("aria-checked", String(bouton.dataset.valeur === lireStatut(recette)));
-    }
+    listeStatuts.value = lireStatut(recette);
   }
-  choixStatut.addEventListener("click", (evenement) => {
-    const bouton = evenement.target.closest(".statut");
-    if (bouton) appliquer("statut", bouton.dataset.valeur);
-  });
+  listeStatuts.addEventListener("change", () => appliquer("statut", listeStatuts.value));
   afficherStatut();
 
   // Notes personnelles : enregistrées sur demande (une modification = une ligne d'historique).
@@ -531,11 +567,16 @@ async function vueRecette(id) {
 
   const boutonPartager = el("button", { type: "button", class: "bouton bouton--secondaire" }, "📤 Partager");
   boutonPartager.addEventListener("click", () => partager(recette, message, personnes));
-  const ecranAllume = garderEcranAllume(message);
+  const ecranAllume = garderEcranAllume();
 
   return {
     contenu: el("article", { class: "recette" },
-      el("a", { href: "#/", class: "retour" }, "← Mes recettes"),
+      // Barre figée : retour à gauche ; écran allumé et statut à droite, à portée pendant qu'on cuisine.
+      enteteFige(el("div", { class: "entete-vue__barre" },
+        el("a", { href: "#/", class: "entete-vue__retour", "aria-label": "Retour à mes recettes" }, "←"),
+        el("span", { class: "entete-vue__espace" }),
+        ecranAllume.bouton,
+        choixStatut)),
       el("h2", {}, String(recette.nom ?? id)),
       photoPlat,
       source && el("p", { class: "discret" }, source),
@@ -546,8 +587,7 @@ async function vueRecette(id) {
       (categorie || etiquettes.length > 0) && el("ul", { class: "etiquettes" },
         categorie && el("li", { class: "etiquette--categorie" }, categorie),
         etiquettes.map((etiquette) => el("li", {}, etiquette))),
-      choixStatut,
-      el("div", { class: "barre-actions" }, boutonListe, boutonPartager, ecranAllume.bouton),
+      el("div", { class: "barre-actions" }, boutonPartager, boutonListe),
       message,
       el("h3", {}, "Ingrédients"),
       reglagePortions,
@@ -563,14 +603,15 @@ async function vueRecette(id) {
   };
 }
 
-// Bouton « Garder l'écran allumé » : tant qu'il est activé, le téléphone ne se met pas en veille.
+// Icône « Garder l'écran allumé » (🔆) : tant qu'elle est activée, le téléphone ne se met pas en veille.
 // Jamais mémorisé : il s'arrête en quittant la recette. Quand l'application passe en arrière-plan,
 // le navigateur rend la main ; on redemande l'écran allumé au retour.
-// Masqué si le navigateur ne sait pas le faire.
-function garderEcranAllume(message) {
+// Masquée si le navigateur ne sait pas le faire.
+function garderEcranAllume() {
   const bouton = el("button", {
-    type: "button", class: "bouton bouton--secondaire", "aria-pressed": "false", hidden: !("wakeLock" in navigator),
-  }, "🔆 Garder l'écran allumé");
+    type: "button", class: "bouton-icone", "aria-pressed": "false", "aria-label": "Garder l'écran allumé",
+    title: "Garder l'écran allumé", hidden: !("wakeLock" in navigator),
+  }, "🔆");
   let verrou = null;
   let actif = false;
 
@@ -581,8 +622,7 @@ function garderEcranAllume(message) {
       if (!actif) await liberer(); // arrêté pendant la demande
     } catch {
       arreter();
-      message.textContent = "Impossible de garder l'écran allumé (mode économie d'énergie activé ?).";
-      message.className = "message message--erreur";
+      notifier("Impossible de garder l'écran allumé (mode économie d'énergie activé ?).", "erreur");
     }
   }
 
@@ -598,7 +638,6 @@ function garderEcranAllume(message) {
 
   function afficherEtat() {
     bouton.setAttribute("aria-pressed", String(actif));
-    bouton.textContent = actif ? "🔆 Écran maintenu allumé" : "🔆 Garder l'écran allumé";
   }
 
   function arreter() {
@@ -612,11 +651,13 @@ function garderEcranAllume(message) {
   bouton.addEventListener("click", () => {
     if (actif) {
       arreter();
+      notifier("Mise en veille normale rétablie.");
       return;
     }
     actif = true;
     document.addEventListener("visibilitychange", auRetour);
     afficherEtat();
+    notifier("🔆 Écran maintenu allumé tant que la recette est ouverte.");
     demander();
   });
 
@@ -774,6 +815,7 @@ const LIGNES_HISTORIQUE = 20;
 // Les articles cochés descendent en bas de leur recette.
 async function vueCourses() {
   const contenu = el("div");
+  const compteur = el("span", { class: "discret" });
   const message = el("p", { class: "message", role: "status" });
   let texte = "";
 
@@ -843,6 +885,7 @@ async function vueCourses() {
     if (nettoyee !== liste) await ecrireListeCourses(nettoyee);
     texte = listeEnTexte(construite);
 
+    compteur.textContent = "";
     if (!liste.recettes.length) {
       contenu.replaceChildren(pageVide("🛒", "Votre liste de courses est vide.",
         "Sur une recette, touchez « 🛒 Ajouter à la liste ». Pour en ajouter plusieurs d'un coup, touchez « 🛒 Sélectionner » dans Mes recettes.",
@@ -851,6 +894,7 @@ async function vueCourses() {
     }
     const tous = construite.recettes.flatMap((recette) => recette.articles);
     const restants = tous.filter((article) => !article.coche).length;
+    compteur.textContent = restants ? `${restants} à acheter` : "✓ Tout acheté";
     contenu.replaceChildren(
       el("p", { class: "discret" },
         `${nombreRecettes(construite.recettes.length)} · ${restants} article${restants > 1 ? "s" : ""} à acheter sur ${tous.length}`),
@@ -866,7 +910,7 @@ async function vueCourses() {
   }
 
   await rafraichir();
-  return { contenu: page("Liste de courses", contenu), rafraichir };
+  return { contenu: el("div", {}, enteteFige(ligneTitre("Liste de courses", compteur)), contenu), rafraichir };
 }
 
 const vues = {
