@@ -26,7 +26,7 @@
 - **Liste de courses :** je sélectionne plusieurs recettes et l'application me donne une seule liste de courses qui regroupe tous les ingrédients nécessaires.
 - **En cuisine :**
   - j'ajuste le nombre de personnes (− / +) et les quantités sont recalculées, arrondies à ce qui se mesure en cuisine (œufs à l'entier, cuillères et pièces au ½ près, passage en kg ou en litres). Le réglage n'est jamais enregistré : la recette se rouvre toujours sur son nombre d'origine. Les recettes sans nombre de personnes (pâtes fraîches, bouillons, fonds) n'ont pas de réglage, et les quantités citées dans les étapes restent celles d'origine ;
-  - l'écran reste allumé pendant que je cuisine.
+  - le bouton **🔆 Garder l'écran allumé** d'une recette empêche le téléphone de se mettre en veille pendant que je cuisine. Il s'arrête en quittant la recette ou en touchant à nouveau le bouton, et reprend tout seul si je reviens dans l'application après l'avoir quittée un instant. Il n'apparaît pas si le navigateur ne sait pas le faire (sur iPhone, il faut une version récente d'iOS).
 
 ## Deux façons d'importer une recette
 
@@ -144,7 +144,7 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [x] Classer les recettes (nom, livre, catégorie, cuisine, chef, statut) et étagère des livres
 - [ ] Rechercher et filtrer les recettes (catégorie, cuisine, difficulté, mots-clés, statut)
 - [x] Ajuster les portions
-- [ ] Garder l'écran allumé en cuisine
+- [x] Garder l'écran allumé en cuisine
 - [x] Ajouter des notes personnelles
 - [ ] Générer une liste de courses à partir de plusieurs recettes
 - [ ] Importer une recette à partir d'une photo (OCR)
