@@ -7,11 +7,11 @@ import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
 import {
   CATEGORIES, CLASSEMENTS, STATUTS, classerRecettes, formaterIngredient, formaterInfos, formaterModification,
-  formaterSource, grouperIngredients, infosStatut, lireStatut, majuscule, modifier, recetteEnTexte, trierParPage,
-  valeurActuelle,
+  formaterSource, grouperIngredients, infosStatut, ingredientsPour, lireStatut, majuscule, modifier, nombrePersonnes,
+  recetteEnTexte, trierParPage, valeurActuelle,
 } from "./recette.js";
 
-const VERSION = "0.8.0";
+const VERSION = "0.9.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -269,8 +269,8 @@ function lienWeb(adresse) {
 }
 
 // Ouvre le menu de partage du téléphone, ou copie la recette si le navigateur ne sait pas partager.
-async function partager(recette, message) {
-  const texte = recetteEnTexte(recette);
+async function partager(recette, message, personnes) {
+  const texte = recetteEnTexte(recette, personnes ?? recette.portions);
   const afficherMessage = (contenu, type) => {
     message.textContent = contenu;
     message.className = `message message--${type}`;
@@ -291,6 +291,9 @@ async function partager(recette, message) {
   }
 }
 
+const PERSONNES_MIN = 1;
+const PERSONNES_MAX = 50;
+
 async function vueRecette(id) {
   const entree = await stockage.lireRecette(id);
   if (!entree) {
@@ -304,7 +307,7 @@ async function vueRecette(id) {
   let { recette } = entree;
   const source = formaterSource(recette);
   const lienSource = lienWeb(recette.source?.url);
-  const infos = formaterInfos(recette);
+  const infos = formaterInfos(recette, { avecPortions: false }); // le nombre de personnes a son propre réglage
   const categorie = recette.categorie && (CATEGORIES[recette.categorie] ?? majuscule(String(recette.categorie)));
   const etiquettes = [
     recette.cuisine,
@@ -362,9 +365,47 @@ async function vueRecette(id) {
     messageNotes.className = `message message--${enregistre ? "succes" : "info"}`;
   });
 
+  // Nombre de personnes : ajustable sur cet écran seulement. Jamais enregistré :
+  // la recette se rouvre toujours sur son nombre d'origine. Sans nombre d'origine, pas de réglage.
+  const origine = Number.isInteger(recette.portions) && recette.portions > 0 ? recette.portions : null;
+  let personnes = origine;
+  const listeIngredients = el("div");
+  const avertissementEtapes = el("p", { class: "message message--info", hidden: true });
+  const valeurPersonnes = el("output", { class: "portions__valeur", "aria-live": "polite" });
+  const boutonMoins = el("button", { type: "button", class: "portions__bouton", "aria-label": "Une personne de moins" }, "−");
+  const boutonPlus = el("button", { type: "button", class: "portions__bouton", "aria-label": "Une personne de plus" }, "+");
+  const boutonRevenir = el("button", { type: "button", class: "bouton bouton--secondaire bouton--petit", hidden: true });
+
+  function afficherIngredients() {
+    const ajustee = origine !== null && personnes !== origine;
+    valeurPersonnes.textContent = origine ? nombrePersonnes(personnes) : "";
+    boutonMoins.disabled = personnes <= PERSONNES_MIN;
+    boutonPlus.disabled = personnes >= PERSONNES_MAX;
+    boutonRevenir.hidden = !ajustee;
+    boutonRevenir.textContent = `↩ Revenir à ${origine}`;
+    avertissementEtapes.hidden = !ajustee;
+    avertissementEtapes.textContent = ajustee
+      ? `Les quantités citées dans les étapes sont celles de la recette pour ${nombrePersonnes(origine)}.` : "";
+    listeIngredients.replaceChildren(...grouperIngredients(ingredientsPour(recette, personnes)).map((groupe) =>
+      el("section", {},
+        groupe.nom && el("h4", {}, String(groupe.nom)),
+        el("ul", { class: "ingredients" }, groupe.ingredients.map((ingredient) => el("li", {}, formaterIngredient(ingredient)))))));
+  }
+  const changerPersonnes = (nombre) => {
+    personnes = Math.min(Math.max(nombre, PERSONNES_MIN), PERSONNES_MAX);
+    afficherIngredients();
+  };
+  boutonMoins.addEventListener("click", () => changerPersonnes(personnes - 1));
+  boutonPlus.addEventListener("click", () => changerPersonnes(personnes + 1));
+  boutonRevenir.addEventListener("click", () => changerPersonnes(origine));
+  afficherIngredients();
+
+  const reglagePortions = origine && el("div", { class: "portions", role: "group", "aria-label": "Nombre de personnes" },
+    el("span", {}, "Pour"), boutonMoins, valeurPersonnes, boutonPlus, boutonRevenir);
+
   const message = el("p", { class: "message", role: "status" });
   const boutonPartager = el("button", { type: "button", class: "bouton bouton--secondaire" }, "📤 Partager");
-  boutonPartager.addEventListener("click", () => partager(recette, message));
+  boutonPartager.addEventListener("click", () => partager(recette, message, personnes));
 
   return {
     contenu: el("article", { class: "recette" },
@@ -383,10 +424,10 @@ async function vueRecette(id) {
       el("div", { class: "barre-actions" }, boutonPartager),
       message,
       el("h3", {}, "Ingrédients"),
-      grouperIngredients(recette.ingredients).map((groupe) => el("section", {},
-        groupe.nom && el("h4", {}, String(groupe.nom)),
-        el("ul", { class: "ingredients" }, groupe.ingredients.map((ingredient) => el("li", {}, formaterIngredient(ingredient)))))),
+      reglagePortions,
+      listeIngredients,
       el("h3", {}, "Préparation"),
+      avertissementEtapes,
       el("ol", { class: "etapes" }, (recette.etapes ?? []).map((etape) => el("li", {}, String(etape)))),
       el("h3", {}, "Mes notes"),
       champNotes,

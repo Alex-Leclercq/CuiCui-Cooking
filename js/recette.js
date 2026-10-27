@@ -184,7 +184,12 @@ const pluralizerNom = (nom) => nom.replace(/^[^\s']+/, pluriel);
 const de = (nom) => (/^[aeiouyhàâéèêëîïôœûù]/i.test(nom) ? `d'${nom}` : `de ${nom}`);
 
 // { quantite: 5, unite: "gousse", nom: "ail" } → « 5 gousses d'ail ».
-export function formaterIngredient({ quantite, unite, nom = "", precision }) {
+// approximatif (quantité ajustée nettement arrondie) → « ≈ 2 œufs ».
+export function formaterIngredient({ quantite, unite, nom = "", precision, approximatif = false }) {
+  return (approximatif ? "≈ " : "") + texteIngredient({ quantite, unite, nom, precision });
+}
+
+function texteIngredient({ quantite, unite, nom, precision }) {
   let texte;
   if (quantite == null) {
     texte = nom.charAt(0).toUpperCase() + nom.slice(1);
@@ -197,6 +202,66 @@ export function formaterIngredient({ quantite, unite, nom = "", precision }) {
   return precision ? `${texte} (${precision})` : texte;
 }
 
+// ---- Ajustement des portions ----
+// Les quantités sont recalculées puis arrondies à ce qui se mesure en cuisine.
+// Les quantités citées dans les étapes (texte libre) ne sont pas modifiées.
+
+const MASSES = { g: 1, kg: 1000 };   // en grammes
+const VOLUMES = { ml: 1, cl: 10, l: 1000 }; // en millilitres
+const versBase = (quantite, unite) => quantite * (MASSES[unite] ?? VOLUMES[unite] ?? 1);
+const arrondir = (valeur, pas) => Math.round(valeur / pas) * pas;
+
+// Au ½ g sous 10 g, au gramme, aux 5 g dès 100 g, aux 50 g dès 1 kg (affiché en kg).
+function arrondirMasse(grammes) {
+  const pas = grammes >= 1000 ? 50 : grammes >= 100 ? 5 : grammes >= 10 ? 1 : 0.5;
+  const valeur = Math.max(arrondir(grammes, pas), pas);
+  return valeur >= 1000 ? { quantite: valeur / 1000, unite: "kg" } : { quantite: valeur, unite: "g" };
+}
+
+// En cl (au ½ cl sous 10 cl), en l dès 1 l (aux 10 cl). Une recette en ml reste en ml.
+function arrondirVolume(millilitres, uniteOrigine) {
+  if (millilitres >= 1000) return { quantite: Math.max(arrondir(millilitres, 100), 100) / 1000, unite: "l" };
+  if (uniteOrigine === "ml") {
+    const pas = millilitres >= 100 ? 5 : 1;
+    return { quantite: Math.max(arrondir(millilitres, pas), pas), unite: "ml" };
+  }
+  const centilitres = millilitres / 10;
+  const pas = centilitres >= 10 ? 1 : 0.5;
+  return { quantite: Math.max(arrondir(centilitres, pas), pas), unite: "cl" };
+}
+
+// Un ingrédient multiplié par « facteur ». Cuillères, pincées et pièces : au ½ près ;
+// œufs, jaunes et blancs : à l'entier. approximatif = l'arrondi s'écarte de plus de 10 % du calcul exact.
+export function ajusterIngredient(ingredient, facteur) {
+  const { quantite, unite = null, nom = "" } = ingredient;
+  if (facteur === 1 || !Number.isFinite(quantite) || quantite <= 0) return ingredient;
+  const exacte = quantite * facteur;
+  let resultat;
+  if (unite in MASSES) resultat = arrondirMasse(exacte * MASSES[unite]);
+  else if (unite in VOLUMES) resultat = arrondirVolume(exacte * VOLUMES[unite], unite);
+  else if (!unite && /œufs?$/i.test(nom.trim())) resultat = { quantite: Math.max(Math.round(exacte), 1), unite };
+  else resultat = { quantite: Math.max(arrondir(exacte, 0.5), 0.5), unite };
+  const ecart = Math.abs(versBase(resultat.quantite, resultat.unite) - versBase(exacte, unite)) / versBase(exacte, unite);
+  return { ...ingredient, ...resultat, approximatif: ecart > 0.1 };
+}
+
+// Ingrédients de la recette pour « personnes » au lieu de recette.portions.
+// Une précision chiffrée (« environ 13 jaunes ») ne peut pas être recalculée : on indique pour combien elle vaut.
+export function ingredientsPour(recette, personnes) {
+  const origine = recette.portions;
+  const ingredients = Array.isArray(recette.ingredients) ? recette.ingredients : [];
+  if (!origine || !personnes || personnes === origine) return ingredients;
+  return ingredients.map((ingredient) => {
+    const ajuste = ajusterIngredient(ingredient, personnes / origine);
+    const precision = typeof ajuste.precision === "string" && /\d/.test(ajuste.precision)
+      ? `${ajuste.precision}, recette pour ${origine}`
+      : ajuste.precision;
+    return { ...ajuste, precision };
+  });
+}
+
+export const nombrePersonnes = (nombre) => `${nombre} personne${nombre > 1 ? "s" : ""}`;
+
 // « Chef · Titre du livre, p. 120 »
 export function formaterSource(recette) {
   const source = recette.source ?? {};
@@ -205,9 +270,10 @@ export function formaterSource(recette) {
 }
 
 // « Pour 6 personnes · Préparation 20 min · Cuisson 1 h 20 »
-export function formaterInfos(recette) {
+// avecPortions : false quand l'écran affiche à part le réglage du nombre de personnes.
+export function formaterInfos(recette, { avecPortions = true } = {}) {
   return [
-    recette.portions ? `Pour ${recette.portions} personne${recette.portions > 1 ? "s" : ""}` : null,
+    avecPortions && recette.portions ? `Pour ${nombrePersonnes(recette.portions)}` : null,
     formaterDuree(recette.tempsPreparation) && `Préparation ${formaterDuree(recette.tempsPreparation)}`,
     formaterDuree(recette.tempsCuisson) && `Cuisson ${formaterDuree(recette.tempsCuisson)}`,
     formaterDuree(recette.tempsRepos) && `Repos ${formaterDuree(recette.tempsRepos)}`,
@@ -228,7 +294,9 @@ export function grouperIngredients(ingredients = []) {
 // Texte complet envoyé par le bouton Partager (WhatsApp, SMS, e-mail…).
 // Une information par ligne : chef, puis livre ; portions, puis chaque temps.
 // Les notes personnelles ne sont pas partagées.
-export function recetteEnTexte(recette) {
+// personnes : nombre choisi à l'écran ; les quantités sont alors celles ajustées.
+export function recetteEnTexte(recette, personnes = recette.portions) {
+  const ajustee = recette.portions && personnes && personnes !== recette.portions;
   const lignes = [`🍽️ ${recette.nom ?? recette.id}`];
 
   const source = recette.source ?? {};
@@ -237,7 +305,8 @@ export function recetteEnTexte(recette) {
   if (lignesSource.length) lignes.push("", ...lignesSource);
 
   const lignesInfos = [
-    recette.portions ? `Pour ${recette.portions} personne${recette.portions > 1 ? "s" : ""}` : null,
+    ajustee ? `Pour ${nombrePersonnes(personnes)} (recette d'origine : ${recette.portions})`
+      : recette.portions ? `Pour ${nombrePersonnes(recette.portions)}` : null,
     formaterDuree(recette.tempsPreparation) && `Préparation : ${formaterDuree(recette.tempsPreparation)}`,
     formaterDuree(recette.tempsCuisson) && `Cuisson : ${formaterDuree(recette.tempsCuisson)}`,
     formaterDuree(recette.tempsRepos) && `Repos : ${formaterDuree(recette.tempsRepos)}`,
@@ -245,12 +314,13 @@ export function recetteEnTexte(recette) {
   if (lignesInfos.length) lignes.push("", ...lignesInfos);
 
   lignes.push("", "INGRÉDIENTS");
-  for (const groupe of grouperIngredients(recette.ingredients)) {
+  for (const groupe of grouperIngredients(ingredientsPour(recette, personnes))) {
     if (groupe.nom) lignes.push(`${groupe.nom} :`);
     for (const ingredient of groupe.ingredients) lignes.push(`• ${formaterIngredient(ingredient)}`);
   }
 
   lignes.push("", "PRÉPARATION");
+  if (ajustee) lignes.push(`(Quantités citées dans les étapes : recette pour ${recette.portions}.)`);
   (recette.etapes ?? []).forEach((etape, index) => lignes.push(`${index + 1}. ${etape}`));
 
   if (recette.source?.url) lignes.push("", recette.source.url);

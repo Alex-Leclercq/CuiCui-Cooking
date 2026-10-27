@@ -476,6 +476,40 @@ body {
   font-weight: 600;
 }
 
+/* Réglage du nombre de personnes */
+
+.portions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.portions__bouton {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.portions__bouton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.portions__valeur {
+  min-width: 7.5em;
+  font-weight: 600;
+  text-align: center;
+}
+
 .ingredients {
   margin: 0;
   padding-left: 20px;

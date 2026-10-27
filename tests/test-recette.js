@@ -2,8 +2,8 @@
 // Ouvrir tests/test-recette.html avec le serveur local.
 
 import {
-  classerRecettes, formaterDuree, formaterIngredient, formaterInfos, formaterModification, formaterSource,
-  grouperIngredients, lireStatut, majuscule, modifier, recetteEnTexte, trierParPage,
+  ajusterIngredient, classerRecettes, formaterDuree, formaterIngredient, formaterInfos, formaterModification,
+  formaterSource, grouperIngredients, ingredientsPour, lireStatut, majuscule, modifier, recetteEnTexte, trierParPage,
 } from "../js/recette.js";
 
 function egal(obtenu, attendu) {
@@ -217,6 +217,55 @@ const tests = {
       entree("c", { source: { type: "site", titre: "Marmiton" } }),
     ], "livre", [{ id: "mentor", titre: "Méthode Mentor" }]);
     egal(groupes.map((g) => `${g.cle}:${g.titre}`).join(","), "autre:Autre livre,mentor:Méthode Mentor,null:Sans livre");
+  },
+
+  "Portions : gratin dauphinois de 6 à 4 personnes"() {
+    const gratin = {
+      portions: 6,
+      ingredients: [ingredient(1.2, "kg", "pomme de terre"), ingredient(40, "cl", "lait"), ingredient(5, "gousse", "ail"),
+        ingredient(10, "g", "beurre"), ingredient(2, "brin", "thym", "frais, en branches"), ingredient(null, null, "gros sel")],
+    };
+    egal(ingredientsPour(gratin, 4).map(formaterIngredient).join(" | "),
+      "800 g de pomme de terre | 27 cl de lait | 3,5 gousses d'ail | 6,5 g de beurre | ≈ 1,5 brins de thym (frais, en branches) | Gros sel");
+  },
+
+  "Portions : même nombre → quantités inchangées, sans arrondi"() {
+    const recette = { portions: 6, ingredients: [ingredient(12.5, "cl", "lait"), ingredient(0.5, null, "citron vert")] };
+    egal(ingredientsPour(recette, 6), recette.ingredients);
+    egal(ingredientsPour({ portions: null, ingredients: recette.ingredients }, 3), recette.ingredients);
+  },
+
+  "Portions : œufs et jaunes toujours entiers, au moins 1, avec ≈ si l'arrondi est net"() {
+    egal(formaterIngredient(ajusterIngredient(ingredient(3, null, "œuf"), 0.5)), "≈ 2 œufs");
+    egal(formaterIngredient(ajusterIngredient(ingredient(1, null, "jaune d'œuf"), 0.25)), "≈ 1 jaune d'œuf");
+    egal(formaterIngredient(ajusterIngredient(ingredient(8, null, "jaune d'œuf"), 1.44)), "12 jaunes d'œuf");
+  },
+
+  "Portions : cuillères et pincées au ½ près, au moins ½"() {
+    egal(formaterIngredient(ajusterIngredient(ingredient(4, "pincée", "sel"), 4 / 6)), "2,5 pincées de sel");
+    egal(formaterIngredient(ajusterIngredient(ingredient(1, "c. à soupe", "huile d'olive"), 0.25)), "≈ 0,5 c. à soupe d'huile d'olive");
+  },
+
+  "Portions : passage aux kg et aux litres, retour aux grammes et aux cl"() {
+    egal(formaterIngredient(ajusterIngredient(ingredient(800, "g", "farine"), 2)), "1,6 kg de farine");
+    egal(formaterIngredient(ajusterIngredient(ingredient(70, "cl", "lait"), 1.44)), "1 l de lait");
+    egal(formaterIngredient(ajusterIngredient(ingredient(1.5, "kg", "macreuse"), 0.5)), "750 g de macreuse");
+    egal(formaterIngredient(ajusterIngredient(ingredient(1.75, "l", "eau"), 0.5)), "88 cl d'eau");
+    egal(formaterIngredient(ajusterIngredient(ingredient(250, "g", "farine"), 1 / 3)), "83 g de farine");
+  },
+
+  "Portions : précision chiffrée signalée comme valant pour la recette d'origine"() {
+    const recette = { portions: 6, ingredients: [ingredient(260, "g", "jaune d'œuf", "environ 13 jaunes"), ingredient(100, "g", "beurre", "mou")] };
+    egal(ingredientsPour(recette, 3).map(formaterIngredient).join(" | "),
+      "130 g de jaune d'œuf (environ 13 jaunes, recette pour 6) | 50 g de beurre (mou)");
+  },
+
+  "Texte partagé : quantités ajustées et nombre de personnes d'origine"() {
+    const texte = recetteEnTexte({ ...exemple, portions: 6 }, 3);
+    if (!texte.includes("Pour 3 personnes (recette d'origine : 6)")) throw new Error(texte);
+    if (!texte.includes("• 5 g de beurre")) throw new Error(texte);
+    if (!texte.includes("recette pour 6.)")) throw new Error("l'avertissement sur les étapes manque");
+    if (recetteEnTexte(exemple).includes("recette d'origine")) throw new Error("sans ajustement, pas de mention");
   },
 
   "Recettes d'un livre : ordre des pages, sans page à la fin"() {
