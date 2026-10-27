@@ -10,10 +10,21 @@ import {
   infosStatut, lireStatut, majuscule, modifier, recetteEnTexte, valeurActuelle,
 } from "./recette.js";
 
-const VERSION = "0.6.0";
+const VERSION = "0.6.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
-const stockage = await ouvrirStockage();
+const stockage = await ouvrirStockage("cuicui", {
+  // Une ancienne version, ouverte ailleurs (onglet Chrome, appli installée), bloque la base.
+  // (el() est utilisable ici car c'est une déclaration de fonction ; pageVide ne l'est pas encore.)
+  siBloque: () => document.getElementById("vue").replaceChildren(
+    el("div", { class: "vide" },
+      el("span", { class: "vide__icone", "aria-hidden": "true" }, "⏳"),
+      el("p", {}, el("strong", {}, "Mise à jour en attente.")),
+      el("p", { class: "discret" },
+        "CuiCui Cooking est encore ouverte ailleurs dans une ancienne version (onglet Chrome ou appli installée). Fermez-la : l'application reprendra toute seule."))),
+  // Une version plus récente a besoin de la base : on la libère et on propose de recharger.
+  siNouvelleVersion: () => proposerMiseAJour(),
+});
 const synchro = creerSynchro({ stockage, creerClient: creerClientGitHub });
 
 // ---- Outils d'affichage ----
