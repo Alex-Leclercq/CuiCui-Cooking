@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.13.0";
+const VERSION = "0.14.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -150,10 +150,41 @@ function listeRecettes(entrees, selection = null) {
 }
 
 // Liste rangée en sections (catégorie, cuisine, chef, statut…).
-function listeGroupee(groupes, selection = null) {
-  return groupes.map((groupe) => el("section", { class: "groupe" },
-    el("h3", { class: "groupe__titre" }, groupe.titre, el("span", { class: "discret" }, ` · ${groupe.entrees.length}`)),
-    cartesRecettes(groupe.entrees, undefined, selection)));
+// pliage : { estPlie(cle), basculer(cle) } ; un appui sur le titre d'une section plie ou déplie ses recettes.
+function listeGroupee(groupes, selection = null, pliage = null) {
+  return groupes.map((groupe) => {
+    const cle = groupe.cle ?? "";
+    const plie = pliage?.estPlie(cle) ?? false;
+    const titre = [groupe.titre, el("span", { class: "discret" }, ` · ${groupe.entrees.length}`)];
+    return el("section", { class: "groupe" },
+      el("h3", { class: "groupe__titre" }, pliage
+        ? el("button", {
+          type: "button", class: "groupe__plier", "aria-expanded": String(!plie),
+          onclick: () => pliage.basculer(cle),
+        }, el("span", { class: "chevron", "aria-hidden": "true" }), ...titre)
+        : titre),
+      el("div", { hidden: plie }, cartesRecettes(groupe.entrees, undefined, selection)));
+  });
+}
+
+// Sections pliées, par critère de classement : retenues sur ce téléphone (simple confort).
+const CLE_PLIS = "cuicui.sectionsPliees";
+
+function lirePlis() {
+  try {
+    const plis = JSON.parse(localStorage.getItem(CLE_PLIS));
+    return plis && typeof plis === "object" ? plis : {};
+  } catch {
+    return {};
+  }
+}
+
+function retenirPlis(plis) {
+  try {
+    localStorage.setItem(CLE_PLIS, JSON.stringify(plis));
+  } catch {
+    // Stockage indisponible : le pliage vaut pour cette visite.
+  }
 }
 
 // Mode sélection : cocher plusieurs recettes, puis les ajouter d'un coup à la liste de courses,
@@ -280,6 +311,7 @@ async function vueRecettes() {
   const barreClassement = el("div", { class: "classement" },
     el("label", { for: "classement" }, "Classer par"), choix, selection.boutonSelectionner);
   const compteur = el("span", { class: "discret" });
+  const plis = lirePlis();
 
   async function rafraichir() {
     const [entrees, livres, statut] = await Promise.all([stockage.lireRecettes(), stockage.lireLivres(), synchro.lireEtat()]);
@@ -300,7 +332,28 @@ async function vueRecettes() {
     if (critere === "nom") liste.replaceChildren(...listeRecettes(entrees, selection));
     // En mode sélection, l'étagère laisse place aux recettes rangées par livre.
     else if (critere === "livre" && !selection.active()) liste.replaceChildren(etagere(entrees, livres));
-    else liste.replaceChildren(...listeGroupee(classerRecettes(entrees, critere, titresLivres), selection));
+    else {
+      const groupes = classerRecettes(entrees, critere, titresLivres);
+      const cles = groupes.map((groupe) => groupe.cle ?? "");
+      const plies = new Set(plis[critere] ?? []);
+      const changerPlis = (nouveaux) => {
+        plis[critere] = [...nouveaux];
+        retenirPlis(plis);
+        rafraichir();
+      };
+      const pliage = {
+        estPlie: (cle) => plies.has(cle),
+        basculer: (cle) => changerPlis(plies.has(cle) ? [...plies].filter((autre) => autre !== cle) : [...plies, cle]),
+      };
+      const toutPlie = cles.every((cle) => plies.has(cle));
+      liste.replaceChildren(
+        el("div", { class: "groupes__actions" },
+          el("button", {
+            type: "button", class: "bouton bouton--secondaire bouton--petit",
+            onclick: () => changerPlis(toutPlie ? [] : cles),
+          }, toutPlie ? "Tout déplier" : "Tout plier")),
+        ...listeGroupee(groupes, selection, pliage));
+    }
   }
 
   await rafraichir();
@@ -320,7 +373,7 @@ async function vueLivre(idLivre) {
   // En-tête figé compact : retour et titre du livre ; la couverture défile avec la liste.
   const nomFige = el("strong", { class: "entete-vue__nom" });
   const entete = enteteFige(el("div", { class: "entete-vue__barre" },
-    el("a", { href: "#/", class: "entete-vue__retour", "aria-label": "Retour à mes recettes" }, "←"), nomFige));
+    boutonRetour(), nomFige));
 
   async function rafraichir() {
     const [entrees, entreeLivre] = await Promise.all([stockage.lireRecettes(), idLivre ? stockage.lireLivre(idLivre) : null]);
@@ -573,7 +626,7 @@ async function vueRecette(id) {
     contenu: el("article", { class: "recette" },
       // Barre figée : retour à gauche ; écran allumé et statut à droite, à portée pendant qu'on cuisine.
       enteteFige(el("div", { class: "entete-vue__barre" },
-        el("a", { href: "#/", class: "entete-vue__retour", "aria-label": "Retour à mes recettes" }, "←"),
+        boutonRetour(),
         el("span", { class: "entete-vue__espace" }),
         ecranAllume.bouton,
         choixStatut)),
@@ -770,10 +823,11 @@ async function vueReglages() {
             onclick: () => revenir(entree.id, ligne),
           }, libelleRetour));
       })),
-      lignes.length > LIGNES_HISTORIQUE && el("button", {
+      // replaceChildren() écrirait « false » à l'écran : le bouton n'est passé que s'il existe.
+      ...(lignes.length > LIGNES_HISTORIQUE ? [el("button", {
         type: "button", class: "bouton bouton--secondaire bouton--petit",
         onclick: () => { toutAfficher = !toutAfficher; afficherHistoriqueGlobal(); },
-      }, toutAfficher ? "Afficher moins" : `Tout afficher (${lignes.length})`));
+      }, toutAfficher ? "Afficher moins" : `Tout afficher (${lignes.length})`)] : []));
   }
 
   async function revenir(id, ligne) {
@@ -857,7 +911,7 @@ async function vueCourses() {
         type: "button", class: "courses__plier", "aria-expanded": String(!recette.plie), "aria-controls": idIngredients,
         onclick: () => changer((liste) => plierRecette(liste, recette.id, !recette.plie)),
       },
-      el("span", { class: "courses__chevron", "aria-hidden": "true" }),
+      el("span", { class: "chevron", "aria-hidden": "true" }),
       el("strong", {}, recette.nom),
       el("span", { class: "discret courses__compte" },
         restants ? `${restants} / ${recette.articles.length}` : "✓ Tout acheté")),
@@ -955,6 +1009,15 @@ function chargerVue(route) {
   return vues[route]();
 }
 
+// Position de défilement de chaque liste (Mes recettes, un livre, Favoris…), gardée le temps de la visite :
+// en revenant d'une recette, on retrouve la liste là où on l'avait laissée. Une recette s'ouvre toujours en haut.
+const positionsDefilement = new Map();
+let routeAffichee = null;
+// Profondeur de chaque page dans l'historique de l'application (0 = page d'ouverture),
+// pour que le bouton ← ne fasse jamais sortir de l'application.
+let profondeur = history.state?.profondeur ?? 0;
+if (history.state?.profondeur == null) history.replaceState({ profondeur }, "");
+
 async function afficher() {
   const numero = ++numeroAffichage;
   const route = routeCourante();
@@ -965,8 +1028,15 @@ async function afficher() {
   quitterVue = quitter ?? null;
   rafraichirVue = rafraichir ?? null;
   const conteneur = document.getElementById("vue");
+  const estRecette = (chemin) => chemin?.startsWith(PREFIXE_RECETTE);
+  if (routeAffichee && !estRecette(routeAffichee)) positionsDefilement.set(routeAffichee, conteneur.scrollTop);
+  const recetteQuittee = estRecette(routeAffichee) ? identifiant(routeAffichee, PREFIXE_RECETTE) : null;
+  routeAffichee = route;
+
   conteneur.replaceChildren(contenu);
-  conteneur.scrollTop = 0;
+  suivreHauteurEntete(conteneur);
+  conteneur.scrollTop = estRecette(route) ? 0 : positionsDefilement.get(route) ?? 0;
+  if (recetteQuittee) retrouverRecette(conteneur, recetteQuittee);
 
   // Le détail d'une recette ou d'un livre reste rattaché à l'onglet « Recettes ».
   const onglet = estDetail(route) ? "/" : route;
@@ -974,6 +1044,47 @@ async function afficher() {
     if (lien.dataset.route === onglet) lien.setAttribute("aria-current", "page");
     else lien.removeAttribute("aria-current");
   }
+}
+
+// Hauteur de l'en-tête figé de l'écran affiché, dans la variable CSS --hauteur-entete :
+// les titres de section (chef, catégorie…) se collent juste en dessous pendant le défilement.
+const observateurEntete = new ResizeObserver(([mesure]) =>
+  mesure.target.closest(".vue")?.style.setProperty("--hauteur-entete", `${mesure.target.offsetHeight}px`));
+
+function suivreHauteurEntete(conteneur) {
+  observateurEntete.disconnect();
+  const entete = conteneur.querySelector(".entete-vue");
+  if (!entete) return;
+  conteneur.style.setProperty("--hauteur-entete", `${entete.offsetHeight}px`); // tout de suite, puis à chaque changement
+  observateurEntete.observe(entete);
+}
+
+// En revenant d'une recette : sa carte est mise en valeur un instant, et ramenée à l'écran
+// si elle n'y est pas (liste reclassée ou modifiée entre-temps).
+function retrouverRecette(conteneur, id) {
+  const lien = `#/recette/${encodeURIComponent(id)}`;
+  const carte = [...conteneur.querySelectorAll("a.lien-recette")].find((a) => a.getAttribute("href") === lien);
+  if (!carte || !carte.offsetParent) return; // absente, ou dans une section pliée
+  const zone = conteneur.getBoundingClientRect();
+  const hautVisible = conteneur.querySelector(".entete-vue")?.getBoundingClientRect().bottom ?? zone.top;
+  const basVisible = document.querySelector(".navigation").getBoundingClientRect().top;
+  const position = carte.getBoundingClientRect();
+  if (position.top < hautVisible || position.bottom > basVisible) carte.scrollIntoView({ block: "center" });
+  carte.classList.add("lien-recette--recente");
+  carte.addEventListener("animationend", () => carte.classList.remove("lien-recette--recente"), { once: true });
+}
+
+// Bouton ← des en-têtes : revient à l'écran précédent (un livre, les Favoris…) comme le bouton
+// retour du téléphone. Si l'application vient d'être ouverte sur cette page, il mène à Mes recettes.
+function boutonRetour() {
+  return el("a", {
+    href: "#/", class: "entete-vue__retour", "aria-label": "Retour",
+    onclick: (evenement) => {
+      if ((history.state?.profondeur ?? 0) === 0) return;
+      evenement.preventDefault();
+      history.back();
+    },
+  }, "←");
 }
 
 // ---- État global ----
@@ -1079,7 +1190,12 @@ document.addEventListener("visibilitychange", () => {
   verifierMiseAJour();
 });
 
-window.addEventListener("hashchange", afficher);
+window.addEventListener("hashchange", () => {
+  // Nouvelle page : un cran plus loin que la précédente. Retour arrière : la page garde sa profondeur.
+  if (history.state?.profondeur == null) history.replaceState({ profondeur: profondeur + 1 }, "");
+  profondeur = history.state.profondeur;
+  afficher();
+});
 afficher();
 suivreConnexion();
 mettreAJourBadge();

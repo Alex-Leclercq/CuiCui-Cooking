@@ -768,8 +768,8 @@ body {
   flex: 1;
 }
 
-/* Chevron dessiné en CSS : pointe vers le bas quand la recette est dépliée. */
-.courses__chevron {
+/* Chevron dessiné en CSS (courses, sections de recettes) : pointe vers le bas quand c'est déplié. */
+.chevron {
   flex: 0 0 auto;
   width: 10px;
   height: 10px;
@@ -780,8 +780,35 @@ body {
   transition: transform 0.15s;
 }
 
-.courses__plier[aria-expanded="true"] .courses__chevron {
+[aria-expanded="true"] > .chevron {
   transform: rotate(45deg);
+}
+
+/* Titre d'une section de recettes (chef, catégorie…) : un appui plie ou déplie ses recettes. */
+.groupe__plier {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupe__plier .discret {
+  margin-left: -6px;
+  font-weight: 400;
+}
+
+.groupes__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -8px;
 }
 
 .courses__compte {
@@ -929,4 +956,37 @@ body {
 .notification--erreur {
   background: #c0392b;
   color: #ffffff;
+}
+
+/* Recette qu'on vient de quitter : sa carte est entourée un instant dans la liste. */
+.lien-recette--recente {
+  animation: recette-recente 1.8s ease-out;
+}
+
+@keyframes recette-recente {
+  0%, 50% {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+}
+
+/* Sections pliables : titres plus rapprochés, le bouton donne déjà la hauteur à toucher. */
+.groupe__titre:has(.groupe__plier) {
+  margin: 4px 0;
+}
+
+.groupe__titre:has(.groupe__plier[aria-expanded="true"]) {
+  margin-bottom: 8px;
+}
+
+/* Titre de la section en cours collé sous l'en-tête pendant le défilement, comme dans les contacts :
+   le titre suivant le pousse en arrivant. --hauteur-entete est mesurée par js/app.js. */
+.groupe__titre:has(.groupe__plier) {
+  position: sticky;
+  top: calc(var(--hauteur-entete, 0px) - 16px);
+  z-index: 1;
+  margin-right: -16px;
+  margin-left: -16px;
+  padding: 0 16px;
+  background: var(--fond);
 }
