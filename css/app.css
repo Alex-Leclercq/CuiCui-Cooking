@@ -930,3 +930,15 @@ body {
   background: #c0392b;
   color: #ffffff;
 }
+
+/* Recette qu'on vient de quitter : sa carte est entourée un instant dans la liste. */
+.lien-recette--recente {
+  animation: recette-recente 1.8s ease-out;
+}
+
+@keyframes recette-recente {
+  0%, 50% {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+}

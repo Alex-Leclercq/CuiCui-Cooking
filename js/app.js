@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.13.0";
+const VERSION = "0.13.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -320,7 +320,7 @@ async function vueLivre(idLivre) {
   // En-tête figé compact : retour et titre du livre ; la couverture défile avec la liste.
   const nomFige = el("strong", { class: "entete-vue__nom" });
   const entete = enteteFige(el("div", { class: "entete-vue__barre" },
-    el("a", { href: "#/", class: "entete-vue__retour", "aria-label": "Retour à mes recettes" }, "←"), nomFige));
+    boutonRetour(), nomFige));
 
   async function rafraichir() {
     const [entrees, entreeLivre] = await Promise.all([stockage.lireRecettes(), idLivre ? stockage.lireLivre(idLivre) : null]);
@@ -573,7 +573,7 @@ async function vueRecette(id) {
     contenu: el("article", { class: "recette" },
       // Barre figée : retour à gauche ; écran allumé et statut à droite, à portée pendant qu'on cuisine.
       enteteFige(el("div", { class: "entete-vue__barre" },
-        el("a", { href: "#/", class: "entete-vue__retour", "aria-label": "Retour à mes recettes" }, "←"),
+        boutonRetour(),
         el("span", { class: "entete-vue__espace" }),
         ecranAllume.bouton,
         choixStatut)),
@@ -955,6 +955,15 @@ function chargerVue(route) {
   return vues[route]();
 }
 
+// Position de défilement de chaque liste (Mes recettes, un livre, Favoris…), gardée le temps de la visite :
+// en revenant d'une recette, on retrouve la liste là où on l'avait laissée. Une recette s'ouvre toujours en haut.
+const positionsDefilement = new Map();
+let routeAffichee = null;
+// Profondeur de chaque page dans l'historique de l'application (0 = page d'ouverture),
+// pour que le bouton ← ne fasse jamais sortir de l'application.
+let profondeur = history.state?.profondeur ?? 0;
+if (history.state?.profondeur == null) history.replaceState({ profondeur }, "");
+
 async function afficher() {
   const numero = ++numeroAffichage;
   const route = routeCourante();
@@ -965,8 +974,14 @@ async function afficher() {
   quitterVue = quitter ?? null;
   rafraichirVue = rafraichir ?? null;
   const conteneur = document.getElementById("vue");
+  const estRecette = (chemin) => chemin?.startsWith(PREFIXE_RECETTE);
+  if (routeAffichee && !estRecette(routeAffichee)) positionsDefilement.set(routeAffichee, conteneur.scrollTop);
+  const recetteQuittee = estRecette(routeAffichee) ? identifiant(routeAffichee, PREFIXE_RECETTE) : null;
+  routeAffichee = route;
+
   conteneur.replaceChildren(contenu);
-  conteneur.scrollTop = 0;
+  conteneur.scrollTop = estRecette(route) ? 0 : positionsDefilement.get(route) ?? 0;
+  if (recetteQuittee) retrouverRecette(conteneur, recetteQuittee);
 
   // Le détail d'une recette ou d'un livre reste rattaché à l'onglet « Recettes ».
   const onglet = estDetail(route) ? "/" : route;
@@ -974,6 +989,34 @@ async function afficher() {
     if (lien.dataset.route === onglet) lien.setAttribute("aria-current", "page");
     else lien.removeAttribute("aria-current");
   }
+}
+
+// En revenant d'une recette : sa carte est mise en valeur un instant, et ramenée à l'écran
+// si elle n'y est pas (liste reclassée ou modifiée entre-temps).
+function retrouverRecette(conteneur, id) {
+  const lien = `#/recette/${encodeURIComponent(id)}`;
+  const carte = [...conteneur.querySelectorAll("a.lien-recette")].find((a) => a.getAttribute("href") === lien);
+  if (!carte) return;
+  const zone = conteneur.getBoundingClientRect();
+  const hautVisible = conteneur.querySelector(".entete-vue")?.getBoundingClientRect().bottom ?? zone.top;
+  const basVisible = document.querySelector(".navigation").getBoundingClientRect().top;
+  const position = carte.getBoundingClientRect();
+  if (position.top < hautVisible || position.bottom > basVisible) carte.scrollIntoView({ block: "center" });
+  carte.classList.add("lien-recette--recente");
+  carte.addEventListener("animationend", () => carte.classList.remove("lien-recette--recente"), { once: true });
+}
+
+// Bouton ← des en-têtes : revient à l'écran précédent (un livre, les Favoris…) comme le bouton
+// retour du téléphone. Si l'application vient d'être ouverte sur cette page, il mène à Mes recettes.
+function boutonRetour() {
+  return el("a", {
+    href: "#/", class: "entete-vue__retour", "aria-label": "Retour",
+    onclick: (evenement) => {
+      if ((history.state?.profondeur ?? 0) === 0) return;
+      evenement.preventDefault();
+      history.back();
+    },
+  }, "←");
 }
 
 // ---- État global ----
@@ -1079,7 +1122,12 @@ document.addEventListener("visibilitychange", () => {
   verifierMiseAJour();
 });
 
-window.addEventListener("hashchange", afficher);
+window.addEventListener("hashchange", () => {
+  // Nouvelle page : un cran plus loin que la précédente. Retour arrière : la page garde sa profondeur.
+  if (history.state?.profondeur == null) history.replaceState({ profondeur: profondeur + 1 }, "");
+  profondeur = history.state.profondeur;
+  afficher();
+});
 afficher();
 suivreConnexion();
 mettreAJourBadge();
