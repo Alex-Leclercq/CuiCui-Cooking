@@ -10,8 +10,12 @@ import {
   formaterSource, grouperIngredients, infosStatut, ingredientsPour, lireStatut, majuscule, modifier, nombrePersonnes,
   recetteEnTexte, trierParPage, valeurActuelle,
 } from "./recette.js";
+import {
+  ajouterALaListe, cocherArticle, construireListe, listeEnTexte, listeVide, nettoyerCoches, normaliserListe,
+  portionsOrigine, retirerDeLaListe,
+} from "./courses.js";
 
-const VERSION = "0.10.0";
+const VERSION = "0.11.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -91,30 +95,99 @@ const nombreRecettes = (nombre) => `${nombre} recette${nombre > 1 ? "s" : ""}`;
 
 // Recettes, dans l'ordre reçu, chacune menant à son écran de détail.
 // details : texte affiché sous le nom (par défaut « Chef · Livre »).
-function cartesRecettes(entrees, details = detailsParDefaut) {
+// selection : en mode sélection (liste de courses), chaque recette devient une case à cocher.
+function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
   return el("ul", { class: "liste-recettes" }, entrees.map((entree) => {
-    const texte = details(entree.recette);
     const statut = infosStatut(lireStatut(entree.recette));
+    const titre = el("span", { class: "lien-recette__titre" },
+      el("strong", {}, nomRecette(entree)),
+      el("span", { class: "lien-recette__statut", title: statut.libelle, "aria-label": statut.libelle }, statut.icone));
+    if (selection?.active()) {
+      const dejaLa = selection.dansLaListe(entree.id);
+      return el("li", {},
+        el("label", { class: "carte lien-recette lien-recette--choix" },
+          el("input", {
+            type: "checkbox", checked: dejaLa || selection.choisie(entree.id), disabled: dejaLa,
+            onchange: (evenement) => selection.basculer(entree.id, evenement.target.checked),
+          }),
+          el("span", { class: "lien-recette__corps" },
+            titre,
+            el("span", { class: "discret" }, dejaLa ? "Déjà dans la liste de courses" : details(entree.recette)))));
+    }
+    const texte = details(entree.recette);
     return el("li", {},
       el("a", { class: "carte lien-recette", href: `#/recette/${encodeURIComponent(entree.id)}` },
-        el("span", { class: "lien-recette__titre" },
-          el("strong", {}, nomRecette(entree)),
-          el("span", { class: "lien-recette__statut", title: statut.libelle, "aria-label": statut.libelle }, statut.icone)),
+        titre,
         texte && el("span", { class: "discret" }, texte)));
   }));
 }
 
 // Liste de recettes triées par nom.
-function listeRecettes(entrees) {
+function listeRecettes(entrees, selection = null) {
   const [groupe] = classerRecettes(entrees, "nom");
-  return [el("p", { class: "discret" }, nombreRecettes(entrees.length)), cartesRecettes(groupe?.entrees ?? [])];
+  return [el("p", { class: "discret" }, nombreRecettes(entrees.length)), cartesRecettes(groupe?.entrees ?? [], undefined, selection)];
 }
 
 // Liste rangée en sections (catégorie, cuisine, chef, statut…).
-function listeGroupee(groupes) {
+function listeGroupee(groupes, selection = null) {
   return groupes.map((groupe) => el("section", { class: "groupe" },
     el("h3", { class: "groupe__titre" }, groupe.titre, el("span", { class: "discret" }, ` · ${groupe.entrees.length}`)),
-    cartesRecettes(groupe.entrees)));
+    cartesRecettes(groupe.entrees, undefined, selection)));
+}
+
+// Mode sélection : cocher plusieurs recettes, puis les ajouter d'un coup à la liste de courses,
+// chacune pour son nombre de personnes d'origine. reafficher : redessine la liste des recettes.
+function creerSelection(reafficher) {
+  let active = false;
+  const choisies = new Set();
+  let dejaDansLaListe = new Set();
+  const message = el("p", { class: "message", role: "status" });
+  const boutonSelectionner = el("button", { type: "button", class: "bouton bouton--secondaire bouton--petit" }, "🛒 Sélectionner");
+  const boutonAjouter = el("button", { type: "button", class: "bouton" });
+  const boutonAnnuler = el("button", { type: "button", class: "bouton bouton--secondaire" }, "Annuler");
+  const barre = el("div", { class: "barre-selection", hidden: true }, boutonAjouter, boutonAnnuler);
+
+  function afficherBarre() {
+    boutonSelectionner.hidden = active;
+    barre.hidden = !active;
+    boutonAjouter.disabled = choisies.size === 0;
+    boutonAjouter.textContent = choisies.size ? `🛒 Ajouter ${nombreRecettes(choisies.size)}` : "Cochez des recettes";
+  }
+
+  function changerMode(nouveau) {
+    active = nouveau;
+    choisies.clear();
+    afficherBarre();
+    reafficher();
+  }
+
+  boutonSelectionner.addEventListener("click", async () => {
+    dejaDansLaListe = new Set((await lireListeCourses()).recettes.map((choix) => choix.id));
+    message.textContent = "";
+    changerMode(true);
+  });
+  boutonAnnuler.addEventListener("click", () => changerMode(false));
+  boutonAjouter.addEventListener("click", async () => {
+    const recettes = await Promise.all([...choisies].map((id) => stockage.lireRecette(id)));
+    const nombre = recettes.filter(Boolean).length;
+    await modifierListeCourses((liste) => recettes.filter(Boolean)
+      .reduce((suite, entree) => ajouterALaListe(suite, entree.id, portionsOrigine(entree.recette)), liste));
+    changerMode(false);
+    annoncerAjout(message, `${nombreRecettes(nombre)} ajoutée${nombre > 1 ? "s" : ""} à la liste de courses.`);
+  });
+  afficherBarre();
+
+  return {
+    boutonSelectionner, barre, message,
+    active: () => active,
+    choisie: (id) => choisies.has(id),
+    dansLaListe: (id) => dejaDansLaListe.has(id),
+    basculer(id, coche) {
+      if (coche) choisies.add(id);
+      else choisies.delete(id);
+      afficherBarre();
+    },
+  };
 }
 
 // Couverture d'un livre : l'image dès qu'elle est disponible, sinon le titre sur fond coloré.
@@ -178,8 +251,9 @@ async function vueRecettes() {
     retenirClassement(choix.value);
     rafraichir();
   });
+  const selection = creerSelection(() => rafraichir());
   const barreClassement = el("div", { class: "classement" },
-    el("label", { for: "classement" }, "Classer par"), choix);
+    el("label", { for: "classement" }, "Classer par"), choix, selection.boutonSelectionner);
 
   async function rafraichir() {
     const [entrees, livres, statut] = await Promise.all([stockage.lireRecettes(), stockage.lireLivres(), synchro.lireEtat()]);
@@ -195,15 +269,17 @@ async function vueRecettes() {
       return;
     }
     const critere = choix.value;
-    if (critere === "nom") liste.replaceChildren(...listeRecettes(entrees));
-    else if (critere === "livre") liste.replaceChildren(etagere(entrees, livres));
+    const titresLivres = livres.map((entree) => ({ id: entree.id, titre: entree.livre?.titre }));
+    if (critere === "nom") liste.replaceChildren(...listeRecettes(entrees, selection));
+    // En mode sélection, l'étagère laisse place aux recettes rangées par livre.
+    else if (critere === "livre" && !selection.active()) liste.replaceChildren(etagere(entrees, livres));
     else liste.replaceChildren(el("p", { class: "discret" }, nombreRecettes(entrees.length)),
-      ...listeGroupee(classerRecettes(entrees, critere)));
+      ...listeGroupee(classerRecettes(entrees, critere, titresLivres), selection));
   }
 
   await rafraichir();
   return {
-    contenu: page("Mes recettes", barreClassement, liste),
+    contenu: page("Mes recettes", barreClassement, selection.message, liste, selection.barre),
     rafraichir,
   };
 }
@@ -249,12 +325,15 @@ async function vueLivre(idLivre) {
 function vueStatut(statut, titre, vide) {
   return async () => {
     const liste = el("div");
+    const selection = creerSelection(() => rafraichir());
+    const barreSelection = el("div", { class: "classement" }, selection.boutonSelectionner);
     async function rafraichir() {
       const entrees = (await stockage.lireRecettes()).filter((entree) => lireStatut(entree.recette) === statut);
-      liste.replaceChildren(...(entrees.length ? listeRecettes(entrees) : [vide()]));
+      barreSelection.hidden = entrees.length === 0;
+      liste.replaceChildren(...(entrees.length ? listeRecettes(entrees, selection) : [vide()]));
     }
     await rafraichir();
-    return { contenu: page(titre, liste), rafraichir };
+    return { contenu: page(titre, barreSelection, selection.message, liste, selection.barre), rafraichir };
   };
 }
 
@@ -268,16 +347,16 @@ function lienWeb(adresse) {
   }
 }
 
-// Ouvre le menu de partage du téléphone, ou copie la recette si le navigateur ne sait pas partager.
-async function partager(recette, message, personnes) {
-  const texte = recetteEnTexte(recette, personnes ?? recette.portions);
+// Ouvre le menu de partage du téléphone, ou copie le texte si le navigateur ne sait pas partager.
+// copie : message affiché après la copie (« Recette copiée… »).
+async function partagerTexte(titre, texte, message, copie) {
   const afficherMessage = (contenu, type) => {
     message.textContent = contenu;
     message.className = `message message--${type}`;
   };
   if (navigator.share) {
     try {
-      await navigator.share({ title: String(recette.nom ?? recette.id), text: texte });
+      await navigator.share({ title: titre, text: texte });
     } catch (erreur) {
       if (erreur.name !== "AbortError") afficherMessage("Le partage a échoué.", "erreur");
     }
@@ -285,10 +364,32 @@ async function partager(recette, message, personnes) {
   }
   try {
     await navigator.clipboard.writeText(texte);
-    afficherMessage("Recette copiée : collez-la dans un message.", "succes");
+    afficherMessage(copie, "succes");
   } catch {
     afficherMessage("Le partage n'est pas disponible sur cet appareil.", "erreur");
   }
+}
+
+const partager = (recette, message, personnes) => partagerTexte(String(recette.nom ?? recette.id),
+  recetteEnTexte(recette, personnes ?? recette.portions), message, "Recette copiée : collez-la dans un message.");
+
+// ---- Liste de courses ----
+// Rangée sur le téléphone seulement (magasin « meta ») : elle n'est jamais envoyée à GitHub.
+
+const CLE_LISTE_COURSES = "listeCourses";
+const lireListeCourses = async () => normaliserListe(await stockage.lireMeta(CLE_LISTE_COURSES));
+const ecrireListeCourses = (liste) => stockage.ecrireMeta(CLE_LISTE_COURSES, liste);
+
+async function modifierListeCourses(changement) {
+  const liste = changement(await lireListeCourses());
+  await ecrireListeCourses(liste);
+  return liste;
+}
+
+// « Ajoutée à la liste de courses. Voir la liste »
+function annoncerAjout(message, texte) {
+  message.replaceChildren(`${texte} `, el("a", { href: "#/courses" }, "Voir la liste"));
+  message.className = "message message--succes";
 }
 
 const PERSONNES_MIN = 1;
@@ -391,7 +492,31 @@ async function vueRecette(id) {
       el("section", {},
         groupe.nom && el("h4", {}, String(groupe.nom)),
         el("ul", { class: "ingredients" }, groupe.ingredients.map((ingredient) => el("li", {}, formaterIngredient(ingredient)))))));
+    afficherBoutonListe();
   }
+
+  // Liste de courses : la recette y entre pour le nombre de personnes affiché.
+  // Déjà dans la liste pour ce nombre : le bouton y mène ; pour un autre nombre : il le met à jour.
+  const message = el("p", { class: "message", role: "status" });
+  const boutonListe = el("button", { type: "button", class: "bouton bouton--secondaire" });
+  let dansLaListe = (await lireListeCourses()).recettes.find((choix) => choix.id === id) ?? null;
+  const memeNombre = () => dansLaListe && (origine === null || (dansLaListe.personnes ?? origine) === personnes);
+  function afficherBoutonListe() {
+    boutonListe.textContent = !dansLaListe ? "🛒 Ajouter à la liste"
+      : memeNombre() ? "✓ Dans la liste de courses" : "🛒 Mettre à jour la liste";
+  }
+  boutonListe.addEventListener("click", async () => {
+    if (memeNombre()) {
+      location.hash = "#/courses";
+      return;
+    }
+    const miseAJour = !!dansLaListe;
+    const liste = await modifierListeCourses((actuelle) => ajouterALaListe(actuelle, id, personnes));
+    dansLaListe = liste.recettes.find((choix) => choix.id === id);
+    afficherBoutonListe();
+    const pour = origine ? ` pour ${nombrePersonnes(personnes)}` : "";
+    annoncerAjout(message, miseAJour ? `Liste de courses mise à jour${pour}.` : `Ajoutée à la liste de courses${pour}.`);
+  });
   const changerPersonnes = (nombre) => {
     personnes = Math.min(Math.max(nombre, PERSONNES_MIN), PERSONNES_MAX);
     afficherIngredients();
@@ -404,7 +529,6 @@ async function vueRecette(id) {
   const reglagePortions = origine && el("div", { class: "portions", role: "group", "aria-label": "Nombre de personnes" },
     el("span", {}, "Pour"), boutonMoins, valeurPersonnes, boutonPlus, boutonRevenir);
 
-  const message = el("p", { class: "message", role: "status" });
   const boutonPartager = el("button", { type: "button", class: "bouton bouton--secondaire" }, "📤 Partager");
   boutonPartager.addEventListener("click", () => partager(recette, message, personnes));
   const ecranAllume = garderEcranAllume(message);
@@ -423,7 +547,7 @@ async function vueRecette(id) {
         categorie && el("li", { class: "etiquette--categorie" }, categorie),
         etiquettes.map((etiquette) => el("li", {}, etiquette))),
       choixStatut,
-      el("div", { class: "barre-actions" }, boutonPartager, ecranAllume.bouton),
+      el("div", { class: "barre-actions" }, boutonListe, boutonPartager, ecranAllume.bouton),
       message,
       el("h3", {}, "Ingrédients"),
       reglagePortions,
@@ -646,6 +770,93 @@ async function vueReglages() {
 
 const LIGNES_HISTORIQUE = 20;
 
+// Liste de courses : ingrédients additionnés de toutes les recettes choisies, à cocher en magasin.
+// Les articles cochés descendent en bas ; les ingrédients sans quantité sont à vérifier à part.
+async function vueCourses() {
+  const contenu = el("div");
+  const message = el("p", { class: "message", role: "status" });
+  let texte = "";
+
+  async function changer(changement) {
+    await modifierListeCourses(changement);
+    await rafraichir();
+  }
+
+  const boutonPartager = el("button", { type: "button", class: "bouton bouton--secondaire" }, "📤 Partager");
+  boutonPartager.addEventListener("click", () =>
+    partagerTexte("Liste de courses", texte, message, "Liste copiée : collez-la dans un message."));
+  const boutonVider = el("button", { type: "button", class: "bouton bouton--secondaire" }, "🗑️ Vider la liste");
+  boutonVider.addEventListener("click", () => {
+    if (confirm("Vider la liste de courses ? Toutes les recettes et les articles cochés seront retirés.")) changer(listeVide);
+  });
+
+  // Un article : un appui le coche (barré) ou le décoche.
+  const articles = (elements) => el("ul", { class: "courses" }, elements.map((article) =>
+    el("li", {},
+      el("label", { class: `courses__article${article.coche ? " courses__article--coche" : ""}` },
+        el("input", {
+          type: "checkbox", checked: article.coche,
+          onchange: (evenement) => changer((liste) => cocherArticle(liste, article.cle, evenement.target.checked)),
+        }),
+        el("span", {}, article.texte)))));
+
+  // Une recette de la liste : son nombre de personnes se règle ici aussi, et elle peut être retirée.
+  function ligneRecette(recette) {
+    const reglage = (ecart, libelle, classe) => el("button", {
+      type: "button", class: classe, "aria-label": libelle,
+      disabled: recette.personnes + ecart < PERSONNES_MIN || recette.personnes + ecart > PERSONNES_MAX,
+      onclick: () => changer((liste) => ajouterALaListe(liste, recette.id, recette.personnes + ecart)),
+    });
+    return el("li", { class: "carte courses__recette" },
+      el("a", { href: `#/recette/${encodeURIComponent(recette.id)}` }, el("strong", {}, recette.nom)),
+      el("div", { class: "portions" },
+        recette.personnes
+          ? [reglage(-1, "Une personne de moins", "portions__bouton"),
+            el("output", { class: "portions__valeur" }, nombrePersonnes(recette.personnes)),
+            reglage(1, "Une personne de plus", "portions__bouton portions__bouton--plus")]
+          : el("span", { class: "discret" }, "Quantités de la recette (nombre de personnes non indiqué)"),
+        el("button", {
+          type: "button", class: "bouton bouton--secondaire bouton--petit courses__retirer",
+          onclick: () => changer((liste) => retirerDeLaListe(liste, recette.id)),
+        }, "✕ Retirer")));
+  }
+
+  async function rafraichir() {
+    const [liste, entrees] = await Promise.all([lireListeCourses(), stockage.lireRecettes()]);
+    const construite = construireListe(liste, new Map(entrees.map((entree) => [entree.id, entree.recette])));
+    const nettoyee = nettoyerCoches(liste, construite);
+    if (nettoyee !== liste) await ecrireListeCourses(nettoyee);
+    texte = listeEnTexte(construite);
+
+    if (!liste.recettes.length) {
+      contenu.replaceChildren(pageVide("🛒", "Votre liste de courses est vide.",
+        "Sur une recette, touchez « 🛒 Ajouter à la liste ». Pour en ajouter plusieurs d'un coup, touchez « 🛒 Sélectionner » dans Mes recettes.",
+        el("a", { href: "#/", class: "bouton" }, "Voir mes recettes")));
+      return;
+    }
+    const restants = construite.articles.filter((article) => !article.coche).length;
+    contenu.replaceChildren(
+      el("p", { class: "discret" }, construite.articles.length
+        ? `${restants} article${restants > 1 ? "s" : ""} à acheter sur ${construite.articles.length}`
+        : "Aucun ingrédient chiffré dans ces recettes."),
+      el("div", { class: "barre-actions" }, boutonPartager, boutonVider),
+      message,
+      ...(construite.articles.length ? [articles(construite.articles)] : []),
+      ...(construite.placards.length ? [el("h3", {}, "À vérifier dans les placards"), articles(construite.placards)] : []),
+      el("h3", {}, `Recettes (${construite.recettes.length})`),
+      el("ul", { class: "liste-recettes" }, construite.recettes.map(ligneRecette)),
+      ...(construite.introuvables.length === 0 ? [] : [el("div", { class: "carte" },
+        el("p", {}, `${construite.introuvables.length} recette(s) de la liste ne sont plus dans le dépôt.`),
+        el("button", {
+          type: "button", class: "bouton bouton--secondaire bouton--petit",
+          onclick: () => changer((liste) => construite.introuvables.reduce(retirerDeLaListe, liste)),
+        }, "Les retirer"))]));
+  }
+
+  await rafraichir();
+  return { contenu: page("Liste de courses", contenu), rafraichir };
+}
+
 const vues = {
   "/": vueRecettes,
   "/favoris": vueStatut("favorite", "Mes meilleures recettes", () =>
@@ -654,11 +865,7 @@ const vues = {
   "/a-essayer": vueStatut("a-essayer", "À essayer", () =>
     pageVide("📝", "Aucune recette à essayer.",
       "Les recettes jamais cuisinées apparaissent ici, comme une liste de choses à faire.")),
-  "/courses": () => ({
-    contenu: page("Liste de courses",
-      pageVide("🛒", "Votre liste de courses est vide.",
-        "Sélectionnez plusieurs recettes pour obtenir la liste de tous les ingrédients à acheter.")),
-  }),
+  "/courses": vueCourses,
   "/reglages": vueReglages,
 };
 
