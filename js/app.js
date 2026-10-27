@@ -11,7 +11,7 @@ import {
   recetteEnTexte, trierParPage, valeurActuelle,
 } from "./recette.js";
 
-const VERSION = "0.9.1";
+const VERSION = "0.10.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -407,6 +407,7 @@ async function vueRecette(id) {
   const message = el("p", { class: "message", role: "status" });
   const boutonPartager = el("button", { type: "button", class: "bouton bouton--secondaire" }, "📤 Partager");
   boutonPartager.addEventListener("click", () => partager(recette, message, personnes));
+  const ecranAllume = garderEcranAllume(message);
 
   return {
     contenu: el("article", { class: "recette" },
@@ -422,7 +423,7 @@ async function vueRecette(id) {
         categorie && el("li", { class: "etiquette--categorie" }, categorie),
         etiquettes.map((etiquette) => el("li", {}, etiquette))),
       choixStatut,
-      el("div", { class: "barre-actions" }, boutonPartager),
+      el("div", { class: "barre-actions" }, boutonPartager, ecranAllume.bouton),
       message,
       el("h3", {}, "Ingrédients"),
       reglagePortions,
@@ -434,7 +435,68 @@ async function vueRecette(id) {
       champNotes,
       el("div", { class: "barre-actions" }, boutonNotes),
       messageNotes),
+    quitter: ecranAllume.arreter,
   };
+}
+
+// Bouton « Garder l'écran allumé » : tant qu'il est activé, le téléphone ne se met pas en veille.
+// Jamais mémorisé : il s'arrête en quittant la recette. Quand l'application passe en arrière-plan,
+// le navigateur rend la main ; on redemande l'écran allumé au retour.
+// Masqué si le navigateur ne sait pas le faire.
+function garderEcranAllume(message) {
+  const bouton = el("button", {
+    type: "button", class: "bouton bouton--secondaire", "aria-pressed": "false", hidden: !("wakeLock" in navigator),
+  }, "🔆 Garder l'écran allumé");
+  let verrou = null;
+  let actif = false;
+
+  async function demander() {
+    try {
+      verrou = await navigator.wakeLock.request("screen");
+      verrou.addEventListener("release", () => { verrou = null; });
+      if (!actif) await liberer(); // arrêté pendant la demande
+    } catch {
+      arreter();
+      message.textContent = "Impossible de garder l'écran allumé (mode économie d'énergie activé ?).";
+      message.className = "message message--erreur";
+    }
+  }
+
+  async function liberer() {
+    const actuel = verrou;
+    verrou = null;
+    await actuel?.release().catch(() => {});
+  }
+
+  function auRetour() {
+    if (actif && !verrou && document.visibilityState === "visible") demander();
+  }
+
+  function afficherEtat() {
+    bouton.setAttribute("aria-pressed", String(actif));
+    bouton.textContent = actif ? "🔆 Écran maintenu allumé" : "🔆 Garder l'écran allumé";
+  }
+
+  function arreter() {
+    if (!actif) return;
+    actif = false;
+    document.removeEventListener("visibilitychange", auRetour);
+    liberer();
+    afficherEtat();
+  }
+
+  bouton.addEventListener("click", () => {
+    if (actif) {
+      arreter();
+      return;
+    }
+    actif = true;
+    document.addEventListener("visibilitychange", auRetour);
+    afficherEtat();
+    demander();
+  });
+
+  return { bouton, arreter };
 }
 
 async function vueReglages() {
@@ -603,6 +665,7 @@ const vues = {
 // ---- Navigation ----
 
 let rafraichirVue = null;
+let quitterVue = null; // fait le ménage de la vue affichée (écran allumé…) avant d'en changer
 let numeroAffichage = 0;
 
 const PREFIXE_RECETTE = "/recette/";
@@ -632,9 +695,11 @@ function chargerVue(route) {
 async function afficher() {
   const numero = ++numeroAffichage;
   const route = routeCourante();
-  const { contenu, rafraichir } = await chargerVue(route);
+  const { contenu, rafraichir, quitter } = await chargerVue(route);
   if (numero !== numeroAffichage) return; // une autre page a été demandée entre-temps
 
+  quitterVue?.();
+  quitterVue = quitter ?? null;
   rafraichirVue = rafraichir ?? null;
   const conteneur = document.getElementById("vue");
   conteneur.replaceChildren(contenu);

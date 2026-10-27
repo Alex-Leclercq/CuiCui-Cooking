@@ -167,6 +167,12 @@ body {
   color: var(--accent);
 }
 
+/* Bouton à bascule activé (« Écran maintenu allumé ») */
+.bouton--secondaire[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-texte);
+}
+
 .bouton:disabled {
   opacity: 0.5;
   cursor: default;
