@@ -144,9 +144,28 @@ export function creerSynchro({ stockage, creerClient }) {
   }
 
   // ---- Photos ----
-  // Téléchargées à la première consultation, puis gardées sur le téléphone (hors ligne).
+  // Les photos de plat sont préchargées après chaque synchronisation, pour s'afficher sans attente ;
+  // les autres (pages de livre) sont téléchargées à la première consultation.
+  // Toutes restent ensuite sur le téléphone (hors ligne).
 
   const TYPES_PHOTO = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+  const PRECHARGEMENTS_SIMULTANES = 3;
+  const telechargements = new Map(); // sha → promesse : une photo n'est jamais téléchargée deux fois à la fois
+  let prechargement = null;
+  let relancerPrechargement = false;
+
+  function telecharger(github, sha, nom) {
+    if (!telechargements.has(sha)) {
+      const extension = nom.split(".").pop().toLowerCase();
+      const promesse = (async () => {
+        const image = new Blob([await github.lireBlobBinaire(sha)], { type: TYPES_PHOTO[extension] ?? "image/jpeg" });
+        await stockage.ecrirePhoto(sha, image);
+        return image;
+      })().finally(() => telechargements.delete(sha));
+      telechargements.set(sha, promesse);
+    }
+    return telechargements.get(sha);
+  }
 
   async function photo(id, nom) {
     if (!nom) return null;
@@ -157,13 +176,60 @@ export function creerSynchro({ stockage, creerClient }) {
     const github = await client();
     if (!github) return null;
     try {
-      const extension = nom.split(".").pop().toLowerCase();
-      const image = new Blob([await github.lireBlobBinaire(sha)], { type: TYPES_PHOTO[extension] ?? "image/jpeg" });
-      await stockage.ecrirePhoto(sha, image);
-      return image;
+      return await telecharger(github, sha, nom);
     } catch {
       return null; // hors ligne : la photo sera téléchargée plus tard
     }
+  }
+
+  // Photos de plat pas encore sur le téléphone : [{ sha, nom }], sans doublon.
+  async function photosDePlatManquantes() {
+    const presentes = new Set(await stockage.lireEmpreintesPhotos());
+    const manquantes = new Map();
+    for (const { recette, fichiers } of await stockage.lireRecettes()) {
+      const nom = recette?.photos?.plat;
+      const sha = nom && fichiers?.[nom];
+      if (sha && !presentes.has(sha)) manquantes.set(sha, nom);
+    }
+    return [...manquantes].map(([sha, nom]) => ({ sha, nom }));
+  }
+
+  async function passerPrechargement() {
+    const github = await client();
+    if (!github || globalThis.navigator?.connection?.saveData) return; // économiseur de données activé
+    const file = await photosDePlatManquantes();
+    // Quelques téléchargements en parallèle ; à la première erreur (hors ligne…), tout s'arrête.
+    const telechargerLaFile = async () => {
+      try {
+        for (let suivante; (suivante = file.shift());) await telecharger(github, suivante.sha, suivante.nom);
+      } catch (erreur) {
+        file.length = 0;
+        throw erreur;
+      }
+    };
+    await Promise.all(Array.from({ length: PRECHARGEMENTS_SIMULTANES }, telechargerLaFile));
+  }
+
+  // Un seul préchargement à la fois ; une demande pendant l'exécution relance un passage.
+  // N'échoue jamais : ce qui manque sera repris à la prochaine synchronisation.
+  function prechargerPhotos() {
+    if (prechargement) {
+      relancerPrechargement = true;
+      return prechargement;
+    }
+    prechargement = (async () => {
+      try {
+        do {
+          relancerPrechargement = false;
+          await passerPrechargement();
+        } while (relancerPrechargement);
+      } catch {
+        // Hors ligne, limite de requêtes atteinte… : réessayé à la prochaine synchronisation.
+      } finally {
+        prechargement = null;
+      }
+    })();
+    return prechargement;
   }
 
   // ---- Orchestration ----
@@ -177,6 +243,7 @@ export function creerSynchro({ stockage, creerClient }) {
       await recuperer(github);
       derniereErreur = null;
       await stockage.ecrireMeta("derniereSynchro", Date.now());
+      prechargerPhotos(); // en arrière-plan : la synchronisation est déjà terminée
     } catch (erreur) {
       derniereErreur = erreur;
       throw erreur;
@@ -207,6 +274,7 @@ export function creerSynchro({ stockage, creerClient }) {
   return {
     synchroniser,
     photo,
+    prechargerPhotos,
 
     ecouter(ecouteur) {
       ecouteurs.add(ecouteur);

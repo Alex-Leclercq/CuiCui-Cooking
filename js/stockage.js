@@ -49,6 +49,7 @@ function creerStockage(base) {
 
   const lire = (magasin, cle) => executer(magasin, "readonly", (m) => m.get(cle));
   const lireTout = (magasin) => executer(magasin, "readonly", (m) => m.getAll());
+  const lireCles = (magasin) => executer(magasin, "readonly", (m) => m.getAllKeys());
   const ecrire = (magasin, valeur, cle) => executer(magasin, "readwrite", (m) => m.put(valeur, cle));
   const supprimer = (magasin, cle) => executer(magasin, "readwrite", (m) => m.delete(cle));
   const vider = (magasin) => executer(magasin, "readwrite", (m) => m.clear());
@@ -70,6 +71,7 @@ function creerStockage(base) {
     supprimerMeta: (cle) => supprimer("meta", cle),
 
     lirePhoto: (sha) => lire("photos", sha),
+    lireEmpreintesPhotos: () => lireCles("photos"),
     ecrirePhoto: (sha, photo) => ecrire("photos", photo, sha),
 
     fermer: () => base.close(),
