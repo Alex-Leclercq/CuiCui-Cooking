@@ -25,7 +25,7 @@
 - **Partager une recette :** un bouton envoie la recette en texte (ingrédients, étapes, temps, source) par WhatsApp, SMS, e-mail… via le menu de partage du téléphone. Mes notes personnelles ne sont pas partagées.
 - **Liste de courses :** je sélectionne plusieurs recettes et l'application me donne une seule liste de courses qui regroupe tous les ingrédients nécessaires.
 - **En cuisine :**
-  - j'ajuste le nombre de portions et les quantités sont recalculées ;
+  - j'ajuste le nombre de personnes (− / +) et les quantités sont recalculées, arrondies à ce qui se mesure en cuisine (œufs à l'entier, cuillères et pièces au ½ près, passage en kg ou en litres). Le réglage n'est jamais enregistré : la recette se rouvre toujours sur son nombre d'origine. Les recettes sans nombre de personnes (pâtes fraîches, bouillons, fonds) n'ont pas de réglage, et les quantités citées dans les étapes restent celles d'origine ;
   - l'écran reste allumé pendant que je cuisine.
 
 ## Deux façons d'importer une recette
@@ -143,7 +143,7 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [x] Historique des modifications de statut et de notes, avec retour en arrière
 - [x] Classer les recettes (nom, livre, catégorie, cuisine, chef, statut) et étagère des livres
 - [ ] Rechercher et filtrer les recettes (catégorie, cuisine, difficulté, mots-clés, statut)
-- [ ] Ajuster les portions
+- [x] Ajuster les portions
 - [ ] Garder l'écran allumé en cuisine
 - [x] Ajouter des notes personnelles
 - [ ] Générer une liste de courses à partir de plusieurs recettes
