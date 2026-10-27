@@ -13,7 +13,7 @@
   - le nombre de personnes ;
   - le chef ou l'auteur ;
   - la source : le livre d'origine ou le site internet.
-- **Statut de chaque recette :** sur l'écran d'une recette, je choisis où j'en suis :
+- **Statut de chaque recette :** sur l'écran d'une recette, la pastille en haut à droite (par exemple « ⭐ Favorite ▾ ») ouvre la liste des statuts. Changer de statut demande deux gestes, ce qui évite les changements par erreur :
   - 📝 **À essayer** : jamais cuisinée. Ces recettes forment une to-do list dans l'onglet « À essayer » ;
   - ✅ **Déjà cuisinée** : testée, correcte ;
   - ⭐ **Favorite** : testée et adorée. Ces recettes sont dans l'onglet « Favoris ».
@@ -22,16 +22,17 @@
 - **Historique des modifications :** chaque changement de statut ou de notes est noté (date, recette, avant → après). Toutes les recettes sont regroupées dans **Réglages → Historique des modifications**. En cas de mauvaise manipulation, un bouton **↩ Revenir** restaure la valeur précédente.
 - **Classement :** chaque recette a une catégorie (entrée, plat, dessert…), une cuisine (française, japonaise…), une difficulté et des mots-clés libres (végétarien, rapide, hiver…), affichés sous forme de capsules. En haut de la liste, **Classer par** range les recettes par nom, catégorie, cuisine, chef ou statut (le choix est retenu sur le téléphone).
 - **Étagère des livres :** **Classer par → Livre** affiche les couvertures de mes livres de recettes, avec leur nombre de recettes. Un livre ouvre ses recettes dans l'ordre des pages, comme une table des matières. Depuis une recette, un lien mène à toutes les recettes du même livre.
+- **En-têtes figés :** le haut de chaque liste (titre, nombre de recettes, Classer par, Sélectionner) et la barre du haut d'une recette ou d'un livre restent en place pendant que je fais défiler l'écran.
 - **Partager une recette :** un bouton envoie la recette en texte (ingrédients, étapes, temps, source) par WhatsApp, SMS, e-mail… via le menu de partage du téléphone. Mes notes personnelles ne sont pas partagées.
 - **Liste de courses (onglet 🛒 Courses) :**
-  - j'ajoute une recette avec **🛒 Ajouter à la liste**, pour le nombre de personnes affiché (si je change ce nombre ensuite, le bouton propose de **mettre à jour la liste**). Ou, dans Mes recettes, Favoris ou À essayer, **🛒 Sélectionner** me laisse cocher plusieurs recettes et les ajouter d'un coup, chacune pour son nombre de personnes d'origine ;
+  - j'ajoute une recette avec **🛒 Ajouter à la liste**, pour le nombre de personnes affiché (si je change ce nombre ensuite, le bouton propose de **mettre à jour la liste**). Ou, dans Mes recettes, Favoris ou À essayer, **🛒 Sélectionner** me laisse cocher plusieurs recettes et les ajouter d'un coup, chacune pour son nombre de personnes d'origine. Pendant la sélection, la barre « Annuler / Ajouter » remplace la barre des onglets en bas de l'écran ;
   - la liste présente chaque recette avec, en dessous, ses ingrédients pour son nombre de personnes. Un appui sur le titre d'une recette plie ou déplie ses ingrédients (le choix est retenu), et le compteur indique ce qui reste à acheter (« 3 / 7 », puis « ✓ Tout acheté ») ;
   - en magasin, je touche un article pour le barrer : il descend en bas de sa recette. Si je change ensuite le nombre de personnes, il redevient à acheter (sauf les ingrédients sans quantité, comme le sel) ;
   - chaque recette garde son réglage − / +, un bouton **Voir** pour l'ouvrir et un bouton **✕** pour la retirer ; **🗑️ Vider la liste** efface tout, après confirmation ;
   - **📤 Partager** envoie en texte, recette par recette, ce qui reste à acheter. La liste reste sur le téléphone : elle n'est pas envoyée à GitHub.
 - **En cuisine :**
   - j'ajuste le nombre de personnes (− / +) et les quantités sont recalculées, arrondies à ce qui se mesure en cuisine (œufs à l'entier, cuillères et pièces au ½ près, passage en kg ou en litres). Le réglage n'est jamais enregistré : la recette se rouvre toujours sur son nombre d'origine. Les recettes sans nombre de personnes (pâtes fraîches, bouillons, fonds) n'ont pas de réglage, et les quantités citées dans les étapes restent celles d'origine ;
-  - le bouton **🔆 Garder l'écran allumé** d'une recette empêche le téléphone de se mettre en veille pendant que je cuisine. Il s'arrête en quittant la recette ou en touchant à nouveau le bouton, et reprend tout seul si je reviens dans l'application après l'avoir quittée un instant. Il n'apparaît pas si le navigateur ne sait pas le faire.
+  - l'icône **🔆**, en haut à droite d'une recette (à côté du statut), garde l'écran allumé pendant que je cuisine : elle se colore quand elle est active, et un court message le confirme. Elle s'arrête en quittant la recette ou en la touchant à nouveau, et reprend tout seul si je reviens dans l'application après l'avoir quittée un instant. Elle n'apparaît pas si le navigateur ne sait pas le faire.
 
 ## Deux façons d'importer une recette
 
