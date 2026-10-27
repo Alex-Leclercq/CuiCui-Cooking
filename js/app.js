@@ -11,7 +11,7 @@ import {
   recetteEnTexte, trierParPage, valeurActuelle,
 } from "./recette.js";
 
-const VERSION = "0.9.0";
+const VERSION = "0.9.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -372,8 +372,9 @@ async function vueRecette(id) {
   const listeIngredients = el("div");
   const avertissementEtapes = el("p", { class: "message message--info", hidden: true });
   const valeurPersonnes = el("output", { class: "portions__valeur", "aria-live": "polite" });
-  const boutonMoins = el("button", { type: "button", class: "portions__bouton", "aria-label": "Une personne de moins" }, "−");
-  const boutonPlus = el("button", { type: "button", class: "portions__bouton", "aria-label": "Une personne de plus" }, "+");
+  // Les signes − et + sont dessinés en CSS : parfaitement centrés, quelle que soit la police du téléphone.
+  const boutonMoins = el("button", { type: "button", class: "portions__bouton", "aria-label": "Une personne de moins" });
+  const boutonPlus = el("button", { type: "button", class: "portions__bouton portions__bouton--plus", "aria-label": "Une personne de plus" });
   const boutonRevenir = el("button", { type: "button", class: "bouton bouton--secondaire bouton--petit", hidden: true });
 
   function afficherIngredients() {

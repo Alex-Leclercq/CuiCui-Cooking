@@ -178,7 +178,23 @@ export function formaterDuree(minutes) {
 const pluriel = (mot) => (/[sxz]$/.test(mot) ? mot : `${mot}s`);
 
 // Met au pluriel le premier mot : « jaune d'œuf » → « jaunes d'œuf ».
-const pluralizerNom = (nom) => nom.replace(/^[^\s']+/, pluriel);
+// Mots qui ne s'accordent pas : variétés et mots étrangers.
+const INVARIABLES = new Set(["golden", "granny-smith", "bio", "nature"]);
+// Le complément du nom commence à ces mots : « filet de hareng fumé », « os à moelle ».
+const MOTS_DE_LIAISON = new Set(["de", "du", "des", "à", "au", "aux", "en", "pour", "sans", "et", "ou"]);
+
+// Met au pluriel le nom et ses adjectifs, jusqu'au complément :
+// « piment vert doux » → « piments verts doux », « jaune d'œuf » → « jaunes d'œuf ».
+// Les noms propres (« Morteau ») et les mots invariables ne changent pas.
+function pluralizerNom(nom) {
+  const mots = nom.split(" ");
+  for (let index = 0; index < mots.length; index++) {
+    const mot = mots[index];
+    if (MOTS_DE_LIAISON.has(mot.toLowerCase()) || /^[dl]['’]/i.test(mot)) break;
+    if (!INVARIABLES.has(mot.toLowerCase()) && !/^\p{Lu}/u.test(mot)) mots[index] = pluriel(mot);
+  }
+  return mots.join(" ");
+}
 
 // « de beurre », « d'ail », « d'œuf ».
 const de = (nom) => (/^[aeiouyhàâéèêëîïôœûù]/i.test(nom) ? `d'${nom}` : `de ${nom}`);
