@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.14.4";
+const VERSION = "0.14.5";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -120,17 +120,15 @@ const nombreRecettes = (nombre) => `${nombre} recette${nombre > 1 ? "s" : ""}`;
 function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
   return el("ul", { class: "liste-recettes" }, entrees.map((entree) => {
     const statut = infosStatut(lireStatut(entree.recette));
-    // Recette de la liste de courses : liseré orange autour de la tuile, en plus de l'icône 🛒.
-    const classes = `carte lien-recette${recettesDansLaListe.has(entree.id) ? " lien-recette--courses" : ""}`;
     const titre = el("span", { class: "lien-recette__titre" },
       el("strong", {}, nomRecette(entree)),
       el("span", { class: "lien-recette__icones" },
-        recettesDansLaListe.has(entree.id) && el("span", { title: "Dans la liste de courses", "aria-label": "Dans la liste de courses" }, "🛒"),
+        recettesDansLaListe.has(entree.id) && el("span", { class: "icone-caddie", role: "img", title: "Dans la liste de courses", "aria-label": "Dans la liste de courses" }),
         el("span", { title: statut.libelle, "aria-label": statut.libelle }, statut.icone)));
     if (selection?.active()) {
       const dejaLa = selection.dansLaListe(entree.id);
       return el("li", {},
-        el("label", { class: `${classes} lien-recette--choix` },
+        el("label", { class: "carte lien-recette lien-recette--choix" },
           el("input", {
             type: "checkbox", checked: dejaLa || selection.choisie(entree.id), disabled: dejaLa,
             onchange: (evenement) => selection.basculer(entree.id, evenement.target.checked),
@@ -141,7 +139,7 @@ function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
     }
     const texte = details(entree.recette);
     return el("li", {},
-      el("a", { class: classes, href: `#/recette/${encodeURIComponent(entree.id)}` },
+      el("a", { class: "carte lien-recette", href: `#/recette/${encodeURIComponent(entree.id)}` },
         titre,
         texte && el("span", { class: "discret" }, texte)));
   }));

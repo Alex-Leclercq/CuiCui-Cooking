@@ -253,12 +253,6 @@ body {
   text-decoration: none;
 }
 
-/* Recette de la liste de courses : liseré orange permanent. */
-.lien-recette--courses {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
 .lien-recette:active {
   border-color: var(--accent);
 }
@@ -990,4 +984,13 @@ body {
   display: flex;
   flex: 0 0 auto;
   gap: 6px;
+}
+
+/* Recette de la liste de courses : caddie orange (dessin en masque, coloré par la couleur d'accent). */
+.icone-caddie {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  background: var(--accent);
+  mask: url("../icones/caddie.svg") center / contain no-repeat;
 }
