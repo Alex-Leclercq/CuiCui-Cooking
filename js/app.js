@@ -14,8 +14,9 @@ import {
   ajouterALaListe, cocherArticle, construireListe, listeEnTexte, listeVide, nettoyerCoches, normaliserListe,
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
+import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
 
-const VERSION = "0.14.8";
+const VERSION = "0.15.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -321,6 +322,25 @@ function retenirClassement(valeur) {
 
 // La synchronisation est automatique : son état et son bouton sont dans les Réglages,
 // et le badge en haut de l'écran signale ce qui demande attention.
+// Recherche et filtres de Mes recettes : gardés tant que l'application est ouverte (changement d'onglet,
+// retour d'une recette), jamais enregistrés : ils repartent à zéro à la prochaine ouverture.
+let filtresRecettes = filtresVides();
+
+// Panneau Filtres : une rangée de pastilles à cocher par filtre (catégorie, statut, cuisine).
+// choix : valeurs proposées ({ cle, titre, nombre }) ; changer(cle, coche) à chaque pastille touchée.
+function groupeFiltre(titre, choix, cochees, changer) {
+  if (!choix.length) return null;
+  return el("fieldset", { class: "filtres__groupe" },
+    el("legend", {}, titre),
+    el("div", { class: "filtres__pastilles" }, choix.map(({ cle, titre: libelle, nombre }) =>
+      el("label", { class: "pastille" },
+        el("input", {
+          type: "checkbox", checked: cochees.includes(cle),
+          onchange: (evenement) => changer(cle, evenement.target.checked),
+        }),
+        libelle, el("span", { class: "pastille__nombre" }, String(nombre))))));
+}
+
 async function vueRecettes() {
   const liste = el("div");
   const choix = el("select", { class: "classement__choix", id: "classement" },
@@ -338,11 +358,66 @@ async function vueRecettes() {
   const compteur = el("span", { class: "discret" });
   const plis = lirePlis();
 
-  async function rafraichir() {
-    const [entrees, livres, statut] = await Promise.all([stockage.lireRecettes(), stockage.lireLivres(), synchro.lireEtat()]);
+  // Recherche : nom, ingrédients, chef, livre, mots-clés. La liste repart du haut à chaque changement.
+  const champRecherche = el("input", {
+    type: "search", class: "recherche__champ", value: filtresRecettes.texte, enterkeyhint: "search",
+    placeholder: "Nom, ingrédient, chef…", "aria-label": "Rechercher une recette",
+  });
+  const boutonFiltres = el("button", {
+    type: "button", class: "bouton bouton--secondaire bouton--petit", "aria-expanded": "false",
+  });
+  const panneauFiltres = el("div", { class: "carte filtres", hidden: true });
+  const barreRecherche = el("div", { class: "recherche" }, champRecherche, boutonFiltres);
+  async function changerFiltres(modification) {
+    filtresRecettes = { ...filtresRecettes, ...modification };
+    await rafraichir();
+    document.getElementById("vue").scrollTop = 0;
+  }
+  champRecherche.addEventListener("input", () => changerFiltres({ texte: champRecherche.value }));
+  // Touche « Rechercher » du clavier : le clavier se ferme pour laisser voir les résultats.
+  champRecherche.addEventListener("keydown", (evenement) => {
+    if (evenement.key === "Enter") champRecherche.blur();
+  });
+  boutonFiltres.addEventListener("click", () => {
+    panneauFiltres.hidden = !panneauFiltres.hidden;
+    boutonFiltres.setAttribute("aria-expanded", String(!panneauFiltres.hidden));
+    // Le panneau est juste sous l'en-tête : on remonte pour le voir.
+    if (!panneauFiltres.hidden) document.getElementById("vue").scrollTop = 0;
+  });
+  const effacer = () => {
+    champRecherche.value = "";
+    changerFiltres(filtresVides());
+  };
 
-    barreClassement.hidden = entrees.length === 0;
-    compteur.textContent = entrees.length ? nombreRecettes(entrees.length) : "";
+  async function rafraichir() {
+    const [toutes, livres, statut] = await Promise.all([stockage.lireRecettes(), stockage.lireLivres(), synchro.lireEtat()]);
+    const titresLivres = livres.map((entree) => ({ id: entree.id, titre: entree.livre?.titre }));
+    const filtree = rechercheActive(filtresRecettes);
+    const entrees = filtree ? filtrerRecettes(toutes, filtresRecettes, titresLivres) : toutes;
+
+    const nombre = nombreFiltres(filtresRecettes);
+    boutonFiltres.textContent = nombre ? `Filtres (${nombre})` : "Filtres";
+    const coche = (champ) => (cle, oui) => changerFiltres({
+      [champ]: oui ? [...filtresRecettes[champ], cle] : filtresRecettes[champ].filter((autre) => autre !== cle),
+    });
+    const valeurs = choixDeFiltres(toutes);
+    panneauFiltres.replaceChildren(
+      groupeFiltre("Catégorie", valeurs.categories, filtresRecettes.categories, coche("categories")),
+      groupeFiltre("Statut", valeurs.statuts, filtresRecettes.statuts, coche("statuts")),
+      groupeFiltre("Cuisine", valeurs.cuisines, filtresRecettes.cuisines, coche("cuisines")),
+      ...(filtree ? [el("button", { type: "button", class: "bouton bouton--secondaire bouton--petit", onclick: effacer },
+        "Tout effacer")] : []));
+
+    barreClassement.hidden = toutes.length === 0;
+    barreRecherche.hidden = toutes.length === 0;
+    compteur.textContent = !toutes.length ? ""
+      : filtree ? `${entrees.length} sur ${nombreRecettes(toutes.length)}` : nombreRecettes(toutes.length);
+    if (filtree && entrees.length === 0) {
+      liste.replaceChildren(pageVide("🔍", "Aucune recette ne correspond.",
+        "Essayez d'autres mots ou retirez des filtres.",
+        el("button", { type: "button", class: "bouton", onclick: effacer }, "Tout effacer")));
+      return;
+    }
     if (entrees.length === 0) {
       liste.replaceChildren(statut.configure
         ? pageVide("📖", "Aucune recette dans le dépôt.",
@@ -353,10 +428,9 @@ async function vueRecettes() {
       return;
     }
     const critere = choix.value;
-    const titresLivres = livres.map((entree) => ({ id: entree.id, titre: entree.livre?.titre }));
     if (critere === "nom") liste.replaceChildren(...listeRecettes(entrees, selection));
-    // En mode sélection, l'étagère laisse place aux recettes rangées par livre.
-    else if (critere === "livre" && !selection.active()) liste.replaceChildren(etagere(entrees, livres));
+    // En mode sélection ou pendant une recherche, l'étagère laisse place aux recettes rangées par livre.
+    else if (critere === "livre" && !selection.active() && !filtree) liste.replaceChildren(etagere(entrees, livres));
     else {
       const groupes = classerRecettes(entrees, critere, titresLivres);
       const cles = groupes.map((groupe) => groupe.cle ?? "");
@@ -384,8 +458,8 @@ async function vueRecettes() {
   await rafraichir();
   return {
     contenu: el("div", {},
-      enteteFige(ligneTitre("Mes recettes", compteur), barreClassement),
-      selection.message, liste, selection.barre),
+      enteteFige(ligneTitre("Mes recettes", compteur), barreClassement, barreRecherche),
+      panneauFiltres, selection.message, liste, selection.barre),
     rafraichir,
     quitter: selection.quitter,
   };
