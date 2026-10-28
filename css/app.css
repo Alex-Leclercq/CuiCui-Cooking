@@ -985,20 +985,3 @@ body {
   flex: 0 0 auto;
   gap: 6px;
 }
-
-/* Recette de la liste de courses : triangle orange dans le coin en haut à droite, comme un marque-page. */
-.lien-recette--courses {
-  position: relative;
-  overflow: hidden;
-}
-
-.lien-recette--courses::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 18px;
-  height: 18px;
-  background: var(--accent);
-  clip-path: polygon(0 0, 100% 0, 100% 100%);
-}
