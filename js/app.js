@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.14.2";
+const VERSION = "0.14.4";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -120,6 +120,8 @@ const nombreRecettes = (nombre) => `${nombre} recette${nombre > 1 ? "s" : ""}`;
 function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
   return el("ul", { class: "liste-recettes" }, entrees.map((entree) => {
     const statut = infosStatut(lireStatut(entree.recette));
+    // Recette de la liste de courses : liseré orange autour de la tuile, en plus de l'icône 🛒.
+    const classes = `carte lien-recette${recettesDansLaListe.has(entree.id) ? " lien-recette--courses" : ""}`;
     const titre = el("span", { class: "lien-recette__titre" },
       el("strong", {}, nomRecette(entree)),
       el("span", { class: "lien-recette__icones" },
@@ -128,7 +130,7 @@ function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
     if (selection?.active()) {
       const dejaLa = selection.dansLaListe(entree.id);
       return el("li", {},
-        el("label", { class: "carte lien-recette lien-recette--choix" },
+        el("label", { class: `${classes} lien-recette--choix` },
           el("input", {
             type: "checkbox", checked: dejaLa || selection.choisie(entree.id), disabled: dejaLa,
             onchange: (evenement) => selection.basculer(entree.id, evenement.target.checked),
@@ -139,7 +141,7 @@ function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
     }
     const texte = details(entree.recette);
     return el("li", {},
-      el("a", { class: "carte lien-recette", href: `#/recette/${encodeURIComponent(entree.id)}` },
+      el("a", { class: classes, href: `#/recette/${encodeURIComponent(entree.id)}` },
         titre,
         texte && el("span", { class: "discret" }, texte)));
   }));
@@ -217,18 +219,36 @@ function creerSelection(reafficher) {
     reafficher();
   }
 
+  // La sélection ajoute une étape à l'historique (même adresse) : le geste retour du téléphone
+  // quitte la sélection, comme Annuler, au lieu de changer de page.
+  function surRetour() {
+    window.removeEventListener("popstate", surRetour);
+    if (active) changerMode(false);
+  }
+  function entrer() {
+    history.pushState({ ...history.state, selection: true }, "");
+    window.addEventListener("popstate", surRetour);
+    changerMode(true);
+  }
+  // Annuler ou Ajouter : on retire aussi l'étape ajoutée, pour que le retour suivant change bien de page.
+  function sortir() {
+    window.removeEventListener("popstate", surRetour);
+    changerMode(false);
+    if (history.state?.selection) history.back();
+  }
+
   boutonSelectionner.addEventListener("click", async () => {
     dejaDansLaListe = new Set((await lireListeCourses()).recettes.map((choix) => choix.id));
     message.textContent = "";
-    changerMode(true);
+    entrer();
   });
-  boutonAnnuler.addEventListener("click", () => changerMode(false));
+  boutonAnnuler.addEventListener("click", sortir);
   boutonAjouter.addEventListener("click", async () => {
     const recettes = await Promise.all([...choisies].map((id) => stockage.lireRecette(id)));
     const nombre = recettes.filter(Boolean).length;
     await modifierListeCourses((liste) => recettes.filter(Boolean)
       .reduce((suite, entree) => ajouterALaListe(suite, entree.id, portionsOrigine(entree.recette)), liste));
-    changerMode(false);
+    sortir();
     annoncerAjout(message, `${nombreRecettes(nombre)} ajoutée${nombre > 1 ? "s" : ""} à la liste de courses.`);
   });
   afficherBarre();
@@ -237,7 +257,10 @@ function creerSelection(reafficher) {
     boutonSelectionner, barre, message,
     active: () => active,
     // En quittant l'écran : la barre de navigation revient.
-    quitter: () => document.body.classList.remove("selection-en-cours"),
+    quitter() {
+      window.removeEventListener("popstate", surRetour);
+      document.body.classList.remove("selection-en-cours");
+    },
     choisie: (id) => choisies.has(id),
     dansLaListe: (id) => dejaDansLaListe.has(id),
     basculer(id, coche) {

@@ -253,6 +253,12 @@ body {
   text-decoration: none;
 }
 
+/* Recette de la liste de courses : liseré orange permanent. */
+.lien-recette--courses {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 .lien-recette:active {
   border-color: var(--accent);
 }
