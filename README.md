@@ -21,6 +21,7 @@
 - **Photo du plat :** affichée en haut de la recette, sans attente : elle est téléchargée en arrière-plan dès la synchronisation, puis gardée sur le téléphone.
 - **Historique des modifications :** chaque changement de statut ou de notes est noté (date, recette, avant → après). Toutes les recettes sont regroupées dans **Réglages → Historique des modifications**. En cas de mauvaise manipulation, un bouton **↩ Revenir** restaure la valeur précédente.
 - **Classement :** chaque recette a une catégorie (entrée, plat, dessert…), une cuisine (française, japonaise…), une difficulté et des mots-clés libres (végétarien, rapide, hiver…), affichés sous forme de capsules. En haut de la liste, **Classer par** range les recettes par nom, catégorie, cuisine, chef ou statut (le choix est retenu sur le téléphone). Quand les recettes sont rangées en sections (catégorie, cuisine, chef, statut), un appui sur le titre d'une section plie ou déplie ses recettes, et **Tout plier / Tout déplier** agit sur toutes les sections. Les sections pliées sont retenues sur le téléphone, pour chaque critère. Pendant le défilement, le titre de la section en cours reste collé sous l'en-tête, comme dans les contacts du téléphone.
+- **Recherche et filtres :** dans Mes recettes, la barre de recherche trouve les recettes par leur nom, leurs ingrédients, leur chef, leur livre ou leurs mots-clés, sans tenir compte des accents ni des majuscules (« boeuf » trouve « Bœuf »), chaque mot tapé devant être le début d'un mot de la recette. Le bouton **Filtres** ouvre des pastilles à cocher par catégorie, statut et cuisine ; le nombre de recettes trouvées s'affiche en haut (« 12 sur 100 recettes »). Recherche et filtres restent actifs tant que l'application est ouverte, et repartent à zéro à la prochaine ouverture.
 - **Étagère des livres :** **Classer par → Livre** affiche les couvertures de mes livres de recettes, avec leur nombre de recettes. Un livre ouvre ses recettes dans l'ordre des pages, comme une table des matières. Depuis une recette, un lien mène à toutes les recettes du même livre.
 - **En-têtes figés :** le haut de chaque liste (titre, nombre de recettes, Classer par, Sélectionner) et la barre du haut d'une recette ou d'un livre restent en place pendant que je fais défiler l'écran. En revenant d'une recette (bouton ← ou retour du téléphone), je retrouve la liste exactement là où je l'avais laissée. Le bouton ← ramène à l'écran précédent (un livre, les Favoris…), comme le retour du téléphone.
 - **Retour arrière :** depuis une recette ou un livre, il ramène à la page d'où je l'ai ouvert ; depuis un autre onglet (Favoris, À essayer, Courses, Réglages), il ramène toujours à Mes recettes, car les onglets ne s'empilent pas ; depuis Mes recettes, il met l'application en arrière-plan, comme les autres applications du téléphone.
@@ -126,6 +127,7 @@ Les tests s'ouvrent dans le navigateur :
 - synchronisation : http://localhost:8080/tests/test-synchro.html (faux GitHub en mémoire : aucun appel réseau, aucun jeton) ;
 - mise en forme des recettes : http://localhost:8080/tests/test-recette.html ;
 - liste de courses : http://localhost:8080/tests/test-courses.html
+- recherche et filtres : http://localhost:8080/tests/test-recherche.html
 
 ## Installer sur le téléphone
 
@@ -151,7 +153,8 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [x] Choisir le statut d'une recette (à essayer, déjà cuisinée, favorite) et afficher les onglets Favoris et À essayer
 - [x] Historique des modifications de statut et de notes, avec retour en arrière
 - [x] Classer les recettes (nom, livre, catégorie, cuisine, chef, statut) et étagère des livres
-- [ ] Rechercher et filtrer les recettes (catégorie, cuisine, difficulté, mots-clés, statut)
+- [x] Rechercher les recettes (nom, ingrédient, chef, livre, mots-clés) et les filtrer par catégorie, statut et cuisine
+- [ ] Filtrer par saison, par temps de préparation et de cuisson (recettes rapides), par difficulté
 - [x] Ajuster les portions
 - [x] Garder l'écran allumé en cuisine
 - [x] Ajouter des notes personnelles
