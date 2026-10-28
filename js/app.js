@@ -475,15 +475,6 @@ async function vueRecettes() {
   }
   boutonFiltres.addEventListener("click", ouvrirFiltres);
 
-  // Sommaire des sections : sauter à une section (dépliée au passage), sous l'en-tête figé.
-  async function allerASection(cle, plies, changerPlis) {
-    if (plies.has(cle)) await changerPlis([...plies].filter((autre) => autre !== cle));
-    const section = [...liste.querySelectorAll("section.groupe")].find((element) => element.dataset.cle === cle);
-    if (!section) return;
-    const basEntete = vueListe.querySelector(".entete-vue")?.getBoundingClientRect().bottom ?? 0;
-    vue().scrollTop += section.getBoundingClientRect().top - basEntete;
-  }
-
   // Accordéon : ouvrir une section referme celle qui était ouverte. Pour que l'écran ne saute pas,
   // le titre touché reste d'abord à sa place pendant que l'autre section se replie, puis glisse
   // en haut, juste sous l'en-tête figé, avec ses recettes en dessous.
@@ -550,23 +541,14 @@ async function vueRecettes() {
         }));
         return;
       }
-      // Pendant une recherche, tout est déplié au départ (pliages libres, oubliés à chaque changement),
-      // avec un sommaire pour sauter d'une section à l'autre.
-      const changerPlis = (nouveaux) => {
-        plisRecherche = new Set(nouveaux);
-        return rafraichir();
-      };
-      const pliage = {
+      // Pendant une recherche, tout est déplié au départ (pliages libres, oubliés à chaque changement).
+      liste.replaceChildren(...listeGroupee(groupes, selection, {
         estPlie: (cle) => plisRecherche.has(cle),
-        basculer: (cle) => changerPlis(plisRecherche.has(cle)
-          ? [...plisRecherche].filter((autre) => autre !== cle) : [...plisRecherche, cle]),
-      };
-      liste.replaceChildren(
-        ...(groupes.length > 1 ? [el("nav", { class: "sommaire", "aria-label": "Aller à une section" }, groupes.map((groupe) =>
-          el("button", {
-            type: "button", class: "pastille", onclick: () => allerASection(groupe.cle ?? "", plisRecherche, changerPlis),
-          }, groupe.titre, el("span", { class: "pastille__nombre" }, String(groupe.entrees.length)))))] : []),
-        ...listeGroupee(groupes, selection, pliage));
+        basculer: (cle) => {
+          if (!plisRecherche.delete(cle)) plisRecherche.add(cle);
+          return rafraichir();
+        },
+      }));
     }
   }
 

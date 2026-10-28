@@ -1093,21 +1093,3 @@ body {
 .ecran-filtres .filtres__groupe {
   margin-bottom: 20px;
 }
-
-/* Sommaire des sections : une rangée de pastilles qui défile horizontalement. */
-.sommaire {
-  display: flex;
-  gap: 8px;
-  margin: 0 -16px 8px;
-  padding: 0 16px 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.sommaire .pastille {
-  flex: 0 0 auto;
-  color: var(--texte);
-  font: inherit;
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
