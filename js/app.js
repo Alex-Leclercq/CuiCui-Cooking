@@ -16,7 +16,7 @@ import {
 } from "./courses.js";
 import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
 
-const VERSION = "0.16.1";
+const VERSION = "0.17.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -170,26 +170,6 @@ function listeGroupee(groupes, selection = null, pliage = null) {
   });
 }
 
-// Sections pliées, par critère de classement : retenues sur ce téléphone (simple confort).
-const CLE_PLIS = "cuicui.sectionsPliees";
-
-function lirePlis() {
-  try {
-    const plis = JSON.parse(localStorage.getItem(CLE_PLIS));
-    return plis && typeof plis === "object" ? plis : {};
-  } catch {
-    return {};
-  }
-}
-
-function retenirPlis(plis) {
-  try {
-    localStorage.setItem(CLE_PLIS, JSON.stringify(plis));
-  } catch {
-    // Stockage indisponible : le pliage vaut pour cette visite.
-  }
-}
-
 // Mode sélection : cocher plusieurs recettes, puis les ajouter d'un coup à la liste de courses,
 // chacune pour son nombre de personnes d'origine. reafficher : redessine la liste des recettes.
 // Pendant la sélection, la barre « Annuler / Ajouter » prend la place de la barre de navigation.
@@ -324,6 +304,10 @@ function retenirClassement(valeur) {
 // retour d'une recette), jamais enregistrés : ils repartent à zéro à la prochaine ouverture.
 let filtresRecettes = filtresVides();
 
+// Section ouverte, par critère de classement (une seule à la fois, toutes repliées au départ) :
+// gardée tant que l'application est ouverte, comme les filtres.
+const sectionsOuvertes = {};
+
 // Mêmes valeurs cochées (catégorie, statut, cuisine), quel que soit l'ordre ?
 const memesFiltres = (a, b) => ["categories", "statuts", "cuisines"]
   .every((champ) => [...a[champ]].sort().join("|") === [...b[champ]].sort().join("|"));
@@ -360,7 +344,6 @@ async function vueRecettes() {
   const barreClassement = el("div", { class: "classement" },
     el("label", { for: "classement" }, "Classer par"), choix, selection.boutonSelectionner);
   const compteur = el("span", { class: "discret" });
-  const plis = lirePlis();
 
   // Recherche : nom, ingrédients, chef, livre, mots-clés. La liste repart du haut à chaque changement.
   const champRecherche = el("input", {
@@ -501,6 +484,24 @@ async function vueRecettes() {
     vue().scrollTop += section.getBoundingClientRect().top - basEntete;
   }
 
+  // Accordéon : ouvrir une section referme celle qui était ouverte. Pour que l'écran ne saute pas,
+  // le titre touché reste d'abord à sa place pendant que l'autre section se replie, puis glisse
+  // en haut, juste sous l'en-tête figé, avec ses recettes en dessous.
+  const sectionDe = (cle) => [...liste.querySelectorAll("section.groupe")].find((element) => element.dataset.cle === cle);
+  async function basculerSection(critere, cle) {
+    const avant = sectionDe(cle)?.getBoundingClientRect().top;
+    const ouvrir = sectionsOuvertes[critere] !== cle;
+    sectionsOuvertes[critere] = ouvrir ? cle : null;
+    await rafraichir();
+    const section = sectionDe(cle);
+    if (!section || avant === undefined) return;
+    vue().scrollTop += section.getBoundingClientRect().top - avant;
+    if (!ouvrir) return;
+    const basEntete = vueListe.querySelector(".entete-vue")?.getBoundingClientRect().bottom ?? 0;
+    const douceur = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    vue().scrollTo({ top: vue().scrollTop + section.getBoundingClientRect().top - basEntete, behavior: douceur });
+  }
+
   async function rafraichir() {
     const [toutes, livres, statut] = await Promise.all([stockage.lireRecettes(), stockage.lireLivres(), synchro.lireEtat()]);
     const titresLivres = livres.map((entree) => ({ id: entree.id, titre: entree.livre?.titre }));
@@ -539,35 +540,32 @@ async function vueRecettes() {
     else if (critere === "livre" && !selection.active() && !filtree) liste.replaceChildren(etagere(entrees, livres));
     else {
       const groupes = classerRecettes(entrees, critere, titresLivres);
-      const cles = groupes.map((groupe) => groupe.cle ?? "");
-      // Pendant une recherche, tout est déplié au départ et les pliages ne sont pas retenus.
-      const plies = filtree ? plisRecherche : new Set(plis[critere] ?? []);
+      if (!filtree) {
+        // Hors recherche : la liste des sections, toutes repliées sauf celle qu'on a ouverte.
+        // Une seule section : elle est simplement dépliée.
+        const ouverte = groupes.length === 1 ? groupes[0].cle ?? "" : sectionsOuvertes[critere];
+        liste.replaceChildren(...listeGroupee(groupes, selection, groupes.length > 1 && {
+          estPlie: (cle) => cle !== ouverte,
+          basculer: (cle) => basculerSection(critere, cle),
+        }));
+        return;
+      }
+      // Pendant une recherche, tout est déplié au départ (pliages libres, oubliés à chaque changement),
+      // avec un sommaire pour sauter d'une section à l'autre.
       const changerPlis = (nouveaux) => {
-        if (filtree) plisRecherche = new Set(nouveaux);
-        else {
-          plis[critere] = [...nouveaux];
-          retenirPlis(plis);
-        }
+        plisRecherche = new Set(nouveaux);
         return rafraichir();
       };
       const pliage = {
-        estPlie: (cle) => plies.has(cle),
-        basculer: (cle) => changerPlis(plies.has(cle) ? [...plies].filter((autre) => autre !== cle) : [...plies, cle]),
+        estPlie: (cle) => plisRecherche.has(cle),
+        basculer: (cle) => changerPlis(plisRecherche.has(cle)
+          ? [...plisRecherche].filter((autre) => autre !== cle) : [...plisRecherche, cle]),
       };
-      const toutPlie = cles.every((cle) => plies.has(cle));
-      // Une seule section : ni sommaire ni « Tout plier », qui ne serviraient à rien.
       liste.replaceChildren(
-        ...(groupes.length > 1 ? [
-          el("nav", { class: "sommaire", "aria-label": "Aller à une section" }, groupes.map((groupe) =>
-            el("button", {
-              type: "button", class: "pastille", onclick: () => allerASection(groupe.cle ?? "", plies, changerPlis),
-            }, groupe.titre, el("span", { class: "pastille__nombre" }, String(groupe.entrees.length))))),
-          el("div", { class: "groupes__actions" },
-            el("button", {
-              type: "button", class: "bouton bouton--secondaire bouton--petit",
-              onclick: () => changerPlis(toutPlie ? [] : cles),
-            }, toutPlie ? "Tout déplier" : "Tout plier")),
-        ] : []),
+        ...(groupes.length > 1 ? [el("nav", { class: "sommaire", "aria-label": "Aller à une section" }, groupes.map((groupe) =>
+          el("button", {
+            type: "button", class: "pastille", onclick: () => allerASection(groupe.cle ?? "", plisRecherche, changerPlis),
+          }, groupe.titre, el("span", { class: "pastille__nombre" }, String(groupe.entrees.length)))))] : []),
         ...listeGroupee(groupes, selection, pliage));
     }
   }
