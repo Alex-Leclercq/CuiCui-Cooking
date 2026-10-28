@@ -2,7 +2,7 @@
 // Changer CACHE à chaque version pour que les téléphones récupèrent
 // les nouveaux fichiers.
 
-const CACHE = "cuicui-v0.14.3";
+const CACHE = "cuicui-v0.14.4";
 
 const FICHIERS_APPLICATION = [
   "./",
