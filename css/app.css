@@ -716,7 +716,8 @@ body {
   flex: 1;
 }
 
-.selection-en-cours .navigation {
+.selection-en-cours .navigation,
+.filtres-ouverts .navigation {
   display: none;
 }
 
@@ -995,10 +996,10 @@ body {
 }
 
 .recherche__champ {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   min-height: 44px;
-  padding: 8px 12px;
+  padding: 8px 44px 8px 12px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
   background: var(--surface);
@@ -1066,4 +1067,53 @@ body {
 .pastille__nombre {
   font-size: 0.8rem;
   opacity: 0.75;
+}
+
+.recherche__zone {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* La croix du navigateur est remplacée par la nôtre, toujours visible quand il y a du texte. */
+.recherche__champ::-webkit-search-cancel-button {
+  display: none;
+  appearance: none;
+}
+
+.recherche__effacer {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  width: 40px;
+  height: 40px;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: var(--texte-doux);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Écran Filtres : l'en-tête figé, les pastilles, puis la barre « Tout effacer / Afficher » en bas. */
+.ecran-filtres .filtres__groupe {
+  margin-bottom: 20px;
+}
+
+/* Sommaire des sections : une rangée de pastilles qui défile horizontalement. */
+.sommaire {
+  display: flex;
+  gap: 8px;
+  margin: 0 -16px 8px;
+  padding: 0 16px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.sommaire .pastille {
+  flex: 0 0 auto;
+  color: var(--texte);
+  font: inherit;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }

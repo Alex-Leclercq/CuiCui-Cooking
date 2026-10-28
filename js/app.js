@@ -16,7 +16,7 @@ import {
 } from "./courses.js";
 import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
 
-const VERSION = "0.15.0";
+const VERSION = "0.16.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -159,7 +159,7 @@ function listeGroupee(groupes, selection = null, pliage = null) {
     const cle = groupe.cle ?? "";
     const plie = pliage?.estPlie(cle) ?? false;
     const titre = [groupe.titre, el("span", { class: "discret" }, ` · ${groupe.entrees.length}`)];
-    return el("section", { class: "groupe" },
+    return el("section", { class: "groupe", "data-cle": cle },
       el("h3", { class: "groupe__titre" }, pliage
         ? el("button", {
           type: "button", class: "groupe__plier", "aria-expanded": String(!plie),
@@ -320,13 +320,15 @@ function retenirClassement(valeur) {
   }
 }
 
-// La synchronisation est automatique : son état et son bouton sont dans les Réglages,
-// et le badge en haut de l'écran signale ce qui demande attention.
 // Recherche et filtres de Mes recettes : gardés tant que l'application est ouverte (changement d'onglet,
 // retour d'une recette), jamais enregistrés : ils repartent à zéro à la prochaine ouverture.
 let filtresRecettes = filtresVides();
 
-// Panneau Filtres : une rangée de pastilles à cocher par filtre (catégorie, statut, cuisine).
+// Mêmes valeurs cochées (catégorie, statut, cuisine), quel que soit l'ordre ?
+const memesFiltres = (a, b) => ["categories", "statuts", "cuisines"]
+  .every((champ) => [...a[champ]].sort().join("|") === [...b[champ]].sort().join("|"));
+
+// Écran Filtres : une rangée de pastilles à cocher par filtre (catégorie, statut, cuisine).
 // choix : valeurs proposées ({ cle, titre, nombre }) ; changer(cle, coche) à chaque pastille touchée.
 function groupeFiltre(titre, choix, cochees, changer) {
   if (!choix.length) return null;
@@ -341,6 +343,8 @@ function groupeFiltre(titre, choix, cochees, changer) {
         libelle, el("span", { class: "pastille__nombre" }, String(nombre))))));
 }
 
+// La synchronisation est automatique : son état et son bouton sont dans les Réglages,
+// et le badge en haut de l'écran signale ce qui demande attention.
 async function vueRecettes() {
   const liste = el("div");
   const choix = el("select", { class: "classement__choix", id: "classement" },
@@ -363,50 +367,143 @@ async function vueRecettes() {
     type: "search", class: "recherche__champ", value: filtresRecettes.texte, enterkeyhint: "search",
     placeholder: "Nom, ingrédient, chef…", "aria-label": "Rechercher une recette",
   });
-  const boutonFiltres = el("button", {
-    type: "button", class: "bouton bouton--secondaire bouton--petit", "aria-expanded": "false",
-  });
-  const panneauFiltres = el("div", { class: "carte filtres", hidden: true });
-  const barreRecherche = el("div", { class: "recherche" }, champRecherche, boutonFiltres);
+  // Notre propre croix d'effacement : visible dès qu'il y a du texte, même champ quitté
+  // (celle du navigateur n'apparaît que pendant la saisie).
+  const boutonEffacerTexte = el("button", {
+    type: "button", class: "recherche__effacer", "aria-label": "Effacer la recherche", hidden: !filtresRecettes.texte,
+  }, "✕");
+  const boutonFiltres = el("button", { type: "button", class: "bouton bouton--secondaire bouton--petit" });
+  const barreRecherche = el("div", { class: "recherche" },
+    el("div", { class: "recherche__zone" }, champRecherche, boutonEffacerTexte), boutonFiltres);
+  const vue = () => document.getElementById("vue");
+  // Pliages faits pendant une recherche : ils ne valent que pour elle (tout est déplié à chaque changement)
+  // et ne touchent pas aux pliages habituels, qui reviennent quand la recherche est effacée.
+  let plisRecherche = new Set();
   async function changerFiltres(modification) {
     filtresRecettes = { ...filtresRecettes, ...modification };
+    plisRecherche = new Set();
     await rafraichir();
-    document.getElementById("vue").scrollTop = 0;
+    vue().scrollTop = 0;
   }
-  champRecherche.addEventListener("input", () => changerFiltres({ texte: champRecherche.value }));
+  champRecherche.addEventListener("input", () => {
+    boutonEffacerTexte.hidden = !champRecherche.value;
+    changerFiltres({ texte: champRecherche.value });
+  });
   // Touche « Rechercher » du clavier : le clavier se ferme pour laisser voir les résultats.
   champRecherche.addEventListener("keydown", (evenement) => {
     if (evenement.key === "Enter") champRecherche.blur();
   });
-  boutonFiltres.addEventListener("click", () => {
-    panneauFiltres.hidden = !panneauFiltres.hidden;
-    boutonFiltres.setAttribute("aria-expanded", String(!panneauFiltres.hidden));
-    // Le panneau est juste sous l'en-tête : on remonte pour le voir.
-    if (!panneauFiltres.hidden) document.getElementById("vue").scrollTop = 0;
+  boutonEffacerTexte.addEventListener("click", () => {
+    champRecherche.value = "";
+    boutonEffacerTexte.hidden = true;
+    changerFiltres({ texte: "" });
   });
   const effacer = () => {
     champRecherche.value = "";
+    boutonEffacerTexte.hidden = true;
     changerFiltres(filtresVides());
   };
+
+  // Écran Filtres : remplace la liste (onglets, sélection et recherche masqués). Les pastilles cochées
+  // restent un brouillon jusqu'à « Afficher N recettes » ; la croix ou le geste retour l'abandonnent.
+  const vueListe = el("div");
+  const ecranFiltres = el("div", { class: "ecran-filtres", hidden: true });
+  let brouillon = null;
+  let derniereLecture = { toutes: [], titresLivres: [] };
+  let positionListe = 0;
+
+  function masquerFiltres() {
+    window.removeEventListener("popstate", surRetourFiltres);
+    brouillon = null;
+    document.body.classList.remove("filtres-ouverts");
+    ecranFiltres.hidden = true;
+    vueListe.hidden = false;
+  }
+  function surRetourFiltres() {
+    masquerFiltres();
+    vue().scrollTop = positionListe;
+  }
+  function ouvrirFiltres() {
+    brouillon = {
+      categories: [...filtresRecettes.categories], statuts: [...filtresRecettes.statuts],
+      cuisines: [...filtresRecettes.cuisines],
+    };
+    positionListe = vue().scrollTop;
+    // Une étape d'historique (même adresse) : le geste retour ferme l'écran Filtres, comme la croix.
+    history.pushState({ ...history.state, filtres: true }, "");
+    window.addEventListener("popstate", surRetourFiltres);
+    document.body.classList.add("filtres-ouverts");
+    vueListe.hidden = true;
+    ecranFiltres.hidden = false;
+    dessinerFiltres();
+    vue().scrollTop = 0;
+  }
+  function fermerFiltres(appliquer) {
+    const choisis = brouillon;
+    masquerFiltres();
+    if (history.state?.filtres) history.back();
+    if (appliquer) changerFiltres(choisis);
+    else vue().scrollTop = positionListe;
+  }
+  function dessinerFiltres() {
+    const { toutes, titresLivres } = derniereLecture;
+    const valeurs = choixDeFiltres(toutes);
+    const nombre = filtrerRecettes(toutes, { ...filtresRecettes, ...brouillon }, titresLivres).length;
+    const coche = (champ) => (cle, oui) => {
+      brouillon = { ...brouillon, [champ]: oui ? [...brouillon[champ], cle] : brouillon[champ].filter((autre) => autre !== cle) };
+      dessinerFiltres();
+    };
+    // Le bouton d'application n'apparaît qu'après un changement ; sinon, simplement « Fermer ».
+    const modifie = !memesFiltres(brouillon, filtresRecettes);
+    const valider = !modifie
+      ? el("button", { type: "button", class: "bouton barre-selection__ajouter", onclick: () => fermerFiltres(false) }, "Fermer")
+      : el("button", {
+        type: "button", class: "bouton barre-selection__ajouter", disabled: nombre === 0,
+        onclick: () => fermerFiltres(true),
+      }, nombre ? `Afficher ${nombreRecettes(nombre)}` : "Aucune recette");
+    ecranFiltres.replaceChildren(
+      enteteFige(el("div", { class: "entete-vue__barre" },
+        el("strong", { class: "entete-vue__nom" }, "Filtres"),
+        el("span", { class: "entete-vue__espace" }),
+        el("button", {
+          type: "button", class: "bouton-icone", "aria-label": "Fermer les filtres", onclick: () => fermerFiltres(false),
+        }, "✕"))),
+      groupeFiltre("Catégorie", valeurs.categories, brouillon.categories, coche("categories")),
+      groupeFiltre("Statut", valeurs.statuts, brouillon.statuts, coche("statuts")),
+      groupeFiltre("Cuisine", valeurs.cuisines, brouillon.cuisines, coche("cuisines")),
+      el("div", { class: "barre-selection" },
+        el("button", {
+          type: "button", class: "bouton bouton--secondaire",
+          onclick: () => {
+            brouillon = { categories: [], statuts: [], cuisines: [] };
+            dessinerFiltres();
+          },
+        }, "Tout effacer"),
+        valider));
+  }
+  boutonFiltres.addEventListener("click", ouvrirFiltres);
+
+  // Sommaire des sections : sauter à une section (dépliée au passage), sous l'en-tête figé.
+  async function allerASection(cle, plies, changerPlis) {
+    if (plies.has(cle)) await changerPlis([...plies].filter((autre) => autre !== cle));
+    const section = [...liste.querySelectorAll("section.groupe")].find((element) => element.dataset.cle === cle);
+    if (!section) return;
+    const basEntete = vueListe.querySelector(".entete-vue")?.getBoundingClientRect().bottom ?? 0;
+    vue().scrollTop += section.getBoundingClientRect().top - basEntete;
+  }
 
   async function rafraichir() {
     const [toutes, livres, statut] = await Promise.all([stockage.lireRecettes(), stockage.lireLivres(), synchro.lireEtat()]);
     const titresLivres = livres.map((entree) => ({ id: entree.id, titre: entree.livre?.titre }));
+    derniereLecture = { toutes, titresLivres };
+    if (brouillon) dessinerFiltres();
     const filtree = rechercheActive(filtresRecettes);
     const entrees = filtree ? filtrerRecettes(toutes, filtresRecettes, titresLivres) : toutes;
 
     const nombre = nombreFiltres(filtresRecettes);
     boutonFiltres.textContent = nombre ? `Filtres (${nombre})` : "Filtres";
-    const coche = (champ) => (cle, oui) => changerFiltres({
-      [champ]: oui ? [...filtresRecettes[champ], cle] : filtresRecettes[champ].filter((autre) => autre !== cle),
-    });
-    const valeurs = choixDeFiltres(toutes);
-    panneauFiltres.replaceChildren(
-      groupeFiltre("Catégorie", valeurs.categories, filtresRecettes.categories, coche("categories")),
-      groupeFiltre("Statut", valeurs.statuts, filtresRecettes.statuts, coche("statuts")),
-      groupeFiltre("Cuisine", valeurs.cuisines, filtresRecettes.cuisines, coche("cuisines")),
-      ...(filtree ? [el("button", { type: "button", class: "bouton bouton--secondaire bouton--petit", onclick: effacer },
-        "Tout effacer")] : []));
+    // Pendant la sélection, pas d'écran Filtres : seule la recherche reste disponible.
+    boutonFiltres.hidden = selection.active();
 
     barreClassement.hidden = toutes.length === 0;
     barreRecherche.hidden = toutes.length === 0;
@@ -434,34 +531,49 @@ async function vueRecettes() {
     else {
       const groupes = classerRecettes(entrees, critere, titresLivres);
       const cles = groupes.map((groupe) => groupe.cle ?? "");
-      const plies = new Set(plis[critere] ?? []);
+      // Pendant une recherche, tout est déplié au départ et les pliages ne sont pas retenus.
+      const plies = filtree ? plisRecherche : new Set(plis[critere] ?? []);
       const changerPlis = (nouveaux) => {
-        plis[critere] = [...nouveaux];
-        retenirPlis(plis);
-        rafraichir();
+        if (filtree) plisRecherche = new Set(nouveaux);
+        else {
+          plis[critere] = [...nouveaux];
+          retenirPlis(plis);
+        }
+        return rafraichir();
       };
       const pliage = {
         estPlie: (cle) => plies.has(cle),
         basculer: (cle) => changerPlis(plies.has(cle) ? [...plies].filter((autre) => autre !== cle) : [...plies, cle]),
       };
       const toutPlie = cles.every((cle) => plies.has(cle));
+      // Une seule section : ni sommaire ni « Tout plier », qui ne serviraient à rien.
       liste.replaceChildren(
-        el("div", { class: "groupes__actions" },
-          el("button", {
-            type: "button", class: "bouton bouton--secondaire bouton--petit",
-            onclick: () => changerPlis(toutPlie ? [] : cles),
-          }, toutPlie ? "Tout déplier" : "Tout plier")),
+        ...(groupes.length > 1 ? [
+          el("nav", { class: "sommaire", "aria-label": "Aller à une section" }, groupes.map((groupe) =>
+            el("button", {
+              type: "button", class: "pastille", onclick: () => allerASection(groupe.cle ?? "", plies, changerPlis),
+            }, groupe.titre, el("span", { class: "pastille__nombre" }, String(groupe.entrees.length))))),
+          el("div", { class: "groupes__actions" },
+            el("button", {
+              type: "button", class: "bouton bouton--secondaire bouton--petit",
+              onclick: () => changerPlis(toutPlie ? [] : cles),
+            }, toutPlie ? "Tout déplier" : "Tout plier")),
+        ] : []),
         ...listeGroupee(groupes, selection, pliage));
     }
   }
 
   await rafraichir();
+  vueListe.append(
+    enteteFige(ligneTitre("Mes recettes", compteur), barreClassement, barreRecherche),
+    selection.message, liste, selection.barre);
   return {
-    contenu: el("div", {},
-      enteteFige(ligneTitre("Mes recettes", compteur), barreClassement, barreRecherche),
-      panneauFiltres, selection.message, liste, selection.barre),
+    contenu: el("div", {}, vueListe, ecranFiltres),
     rafraichir,
-    quitter: selection.quitter,
+    quitter() {
+      selection.quitter();
+      masquerFiltres();
+    },
   };
 }
 
