@@ -16,7 +16,7 @@ import {
 } from "./courses.js";
 import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
 
-const VERSION = "0.17.2";
+const VERSION = "0.17.3";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
