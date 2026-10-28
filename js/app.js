@@ -16,7 +16,7 @@ import {
 } from "./courses.js";
 import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
 
-const VERSION = "0.17.3";
+const VERSION = "0.17.4";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -304,9 +304,9 @@ function retenirClassement(valeur) {
 // retour d'une recette), jamais enregistrés : ils repartent à zéro à la prochaine ouverture.
 let filtresRecettes = filtresVides();
 
-// Section ouverte, par critère de classement (une seule à la fois, toutes repliées au départ) :
-// gardée tant que l'application est ouverte, comme les filtres.
-const sectionsOuvertes = {};
+// Section ouverte (une seule à la fois) : toutes repliées au départ et à chaque changement de classement ;
+// gardée en allant voir une recette puis en revenant, tant que l'application est ouverte.
+let sectionOuverte = null;
 
 // Mêmes valeurs cochées (catégorie, statut, cuisine), quel que soit l'ordre ?
 const memesFiltres = (a, b) => ["categories", "statuts", "cuisines"]
@@ -337,6 +337,7 @@ async function vueRecettes() {
   // Nouveau classement : la liste repart du haut (l'ancienne position n'a plus de sens).
   choix.addEventListener("change", async () => {
     retenirClassement(choix.value);
+    sectionOuverte = null;
     await rafraichir();
     document.getElementById("vue").scrollTop = 0;
   });
@@ -479,10 +480,10 @@ async function vueRecettes() {
   // le titre touché reste d'abord à sa place pendant que l'autre section se replie, puis glisse
   // en haut, juste sous l'en-tête figé, avec ses recettes en dessous.
   const sectionDe = (cle) => [...liste.querySelectorAll("section.groupe")].find((element) => element.dataset.cle === cle);
-  async function basculerSection(critere, cle) {
+  async function basculerSection(cle) {
     const avant = sectionDe(cle)?.getBoundingClientRect().top;
-    const ouvrir = sectionsOuvertes[critere] !== cle;
-    sectionsOuvertes[critere] = ouvrir ? cle : null;
+    const ouvrir = sectionOuverte !== cle;
+    sectionOuverte = ouvrir ? cle : null;
     await rafraichir();
     const section = sectionDe(cle);
     if (!section || avant === undefined) return;
@@ -534,10 +535,9 @@ async function vueRecettes() {
       if (!filtree) {
         // Hors recherche : la liste des sections, toutes repliées sauf celle qu'on a ouverte.
         // Une seule section (par exemple un seul chef) : elle est simplement dépliée, sans pliage.
-        const ouverte = sectionsOuvertes[critere];
         liste.replaceChildren(...listeGroupee(groupes, selection, groupes.length > 1 ? {
-          estPlie: (cle) => cle !== ouverte,
-          basculer: (cle) => basculerSection(critere, cle),
+          estPlie: (cle) => cle !== sectionOuverte,
+          basculer: (cle) => basculerSection(cle),
         } : null));
         return;
       }
