@@ -806,12 +806,6 @@ body {
   font-weight: 400;
 }
 
-.groupes__actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: -8px;
-}
-
 .courses__compte {
   flex: 0 0 auto;
   white-space: nowrap;
