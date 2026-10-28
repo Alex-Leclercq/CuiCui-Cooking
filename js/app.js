@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.14.2";
+const VERSION = "0.14.3";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -217,18 +217,36 @@ function creerSelection(reafficher) {
     reafficher();
   }
 
+  // La sélection ajoute une étape à l'historique (même adresse) : le geste retour du téléphone
+  // quitte la sélection, comme Annuler, au lieu de changer de page.
+  function surRetour() {
+    window.removeEventListener("popstate", surRetour);
+    if (active) changerMode(false);
+  }
+  function entrer() {
+    history.pushState({ ...history.state, selection: true }, "");
+    window.addEventListener("popstate", surRetour);
+    changerMode(true);
+  }
+  // Annuler ou Ajouter : on retire aussi l'étape ajoutée, pour que le retour suivant change bien de page.
+  function sortir() {
+    window.removeEventListener("popstate", surRetour);
+    changerMode(false);
+    if (history.state?.selection) history.back();
+  }
+
   boutonSelectionner.addEventListener("click", async () => {
     dejaDansLaListe = new Set((await lireListeCourses()).recettes.map((choix) => choix.id));
     message.textContent = "";
-    changerMode(true);
+    entrer();
   });
-  boutonAnnuler.addEventListener("click", () => changerMode(false));
+  boutonAnnuler.addEventListener("click", sortir);
   boutonAjouter.addEventListener("click", async () => {
     const recettes = await Promise.all([...choisies].map((id) => stockage.lireRecette(id)));
     const nombre = recettes.filter(Boolean).length;
     await modifierListeCourses((liste) => recettes.filter(Boolean)
       .reduce((suite, entree) => ajouterALaListe(suite, entree.id, portionsOrigine(entree.recette)), liste));
-    changerMode(false);
+    sortir();
     annoncerAjout(message, `${nombreRecettes(nombre)} ajoutée${nombre > 1 ? "s" : ""} à la liste de courses.`);
   });
   afficherBarre();
@@ -237,7 +255,10 @@ function creerSelection(reafficher) {
     boutonSelectionner, barre, message,
     active: () => active,
     // En quittant l'écran : la barre de navigation revient.
-    quitter: () => document.body.classList.remove("selection-en-cours"),
+    quitter() {
+      window.removeEventListener("popstate", surRetour);
+      document.body.classList.remove("selection-en-cours");
+    },
     choisie: (id) => choisies.has(id),
     dansLaListe: (id) => dejaDansLaListe.has(id),
     basculer(id, coche) {
