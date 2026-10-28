@@ -16,7 +16,7 @@ import {
 } from "./courses.js";
 import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
 
-const VERSION = "0.17.1";
+const VERSION = "0.17.2";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -533,12 +533,12 @@ async function vueRecettes() {
       const groupes = classerRecettes(entrees, critere, titresLivres);
       if (!filtree) {
         // Hors recherche : la liste des sections, toutes repliées sauf celle qu'on a ouverte.
-        // Une seule section : elle est simplement dépliée.
-        const ouverte = groupes.length === 1 ? groupes[0].cle ?? "" : sectionsOuvertes[critere];
-        liste.replaceChildren(...listeGroupee(groupes, selection, groupes.length > 1 && {
+        // Une seule section (par exemple un seul chef) : elle est simplement dépliée, sans pliage.
+        const ouverte = sectionsOuvertes[critere];
+        liste.replaceChildren(...listeGroupee(groupes, selection, groupes.length > 1 ? {
           estPlie: (cle) => cle !== ouverte,
           basculer: (cle) => basculerSection(critere, cle),
-        }));
+        } : null));
         return;
       }
       // Pendant une recherche, tout est déplié au départ (pliages libres, oubliés à chaque changement).
