@@ -16,7 +16,7 @@ import {
 } from "./courses.js";
 import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
 
-const VERSION = "0.16.0";
+const VERSION = "0.16.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -393,6 +393,13 @@ async function vueRecettes() {
   champRecherche.addEventListener("keydown", (evenement) => {
     if (evenement.key === "Enter") champRecherche.blur();
   });
+  // Faire défiler la liste pendant la saisie ferme aussi le clavier, pour voir les résultats en plein écran.
+  // Un petit seuil évite de le fermer sur un simple appui.
+  let departToucher = null;
+  const fermerClavierAuDefilement = (evenement) => {
+    if (document.activeElement !== champRecherche || evenement.target === champRecherche || departToucher === null) return;
+    if (Math.abs(evenement.touches[0].clientY - departToucher) > 10) champRecherche.blur();
+  };
   boutonEffacerTexte.addEventListener("click", () => {
     champRecherche.value = "";
     boutonEffacerTexte.hidden = true;
@@ -407,6 +414,8 @@ async function vueRecettes() {
   // Écran Filtres : remplace la liste (onglets, sélection et recherche masqués). Les pastilles cochées
   // restent un brouillon jusqu'à « Afficher N recettes » ; la croix ou le geste retour l'abandonnent.
   const vueListe = el("div");
+  vueListe.addEventListener("touchstart", (evenement) => { departToucher = evenement.touches[0].clientY; }, { passive: true });
+  vueListe.addEventListener("touchmove", fermerClavierAuDefilement, { passive: true });
   const ecranFiltres = el("div", { class: "ecran-filtres", hidden: true });
   let brouillon = null;
   let derniereLecture = { toutes: [], titresLivres: [] };
