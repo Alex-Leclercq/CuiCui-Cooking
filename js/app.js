@@ -15,7 +15,7 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 
-const VERSION = "0.14.7";
+const VERSION = "0.14.8";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -634,7 +634,7 @@ async function vueRecette(id) {
   }
   boutonListe.addEventListener("click", async () => {
     if (memeNombre()) {
-      location.hash = "#/courses";
+      allerVersOnglet("/courses");
       return;
     }
     const miseAJour = !!dansLaListe;
@@ -1051,10 +1051,56 @@ function chargerVue(route) {
 // en revenant d'une recette, on retrouve la liste là où on l'avait laissée. Une recette s'ouvre toujours en haut.
 const positionsDefilement = new Map();
 let routeAffichee = null;
-// Profondeur de chaque page dans l'historique de l'application (0 = page d'ouverture),
-// pour que le bouton ← ne fasse jamais sortir de l'application.
+// Historique de l'application, toujours de la forme : Mes recettes (profondeur 0), puis au plus
+// un autre onglet (profondeur 1), puis les recettes et livres ouverts (un cran de plus chacun).
+// Le retour arrière ramène donc toujours à Mes recettes, et depuis Mes recettes il quitte
+// l'application, comme les autres applications du téléphone.
 let profondeur = history.state?.profondeur ?? 0;
-if (history.state?.profondeur == null) history.replaceState({ profondeur }, "");
+if (history.state?.profondeur == null) {
+  if (routeCourante() === "/") history.replaceState({ profondeur }, "");
+  else {
+    // Ouverte directement sur une autre page : Mes recettes est glissé en dessous.
+    const adresse = location.hash;
+    history.replaceState({ profondeur: 0 }, "", "#/");
+    history.pushState({ profondeur: 1 }, "", adresse);
+    profondeur = 1;
+  }
+}
+
+// Onglet demandé depuis une recette ou un livre : on revient d'abord à l'onglet de profondeur 1.
+let ongletDemande = null;
+
+// Aller à un onglet (barre du bas ou lien vers un onglet) sans empiler les pages :
+// l'onglet remplace celui de profondeur 1, et Mes recettes ramène au bas de l'historique.
+function allerVersOnglet(route) {
+  if (route === "/") {
+    if (profondeur > 0) history.go(-profondeur);
+    return;
+  }
+  if (profondeur === 0) location.hash = `#${route}`;
+  else if (profondeur === 1) location.replace(`#${route}`);
+  else {
+    ongletDemande = route;
+    history.go(-(profondeur - 1));
+  }
+}
+
+window.addEventListener("popstate", () => {
+  if (ongletDemande == null) return;
+  const route = ongletDemande;
+  ongletDemande = null;
+  location.replace(`#${route}`);
+});
+
+document.addEventListener("click", (evenement) => {
+  const lien = evenement.target.closest?.('a[href^="#/"]');
+  if (!lien || evenement.defaultPrevented || evenement.button !== 0
+    || evenement.ctrlKey || evenement.metaKey || evenement.shiftKey) return;
+  const route = lien.getAttribute("href").slice(1);
+  if (!(route in vues)) return;
+  evenement.preventDefault();
+  allerVersOnglet(route);
+});
 
 async function afficher() {
   const numero = ++numeroAffichage;
@@ -1228,8 +1274,13 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("hashchange", () => {
-  // Nouvelle page : un cran plus loin que la précédente. Retour arrière : la page garde sa profondeur.
-  if (history.state?.profondeur == null) history.replaceState({ profondeur: profondeur + 1 }, "");
+  // Nouvelle page : Mes recettes à 0, un autre onglet à 1, une recette ou un livre un cran plus loin
+  // que la page précédente. Retour arrière : la page garde sa profondeur.
+  if (history.state?.profondeur == null) {
+    const route = routeCourante();
+    const nouvelle = route === "/" ? 0 : route in vues ? 1 : profondeur + 1;
+    history.replaceState({ profondeur: nouvelle }, "");
+  }
   profondeur = history.state.profondeur;
   afficher();
 });
