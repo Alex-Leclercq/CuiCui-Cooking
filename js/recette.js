@@ -27,6 +27,9 @@ export const CATEGORIES = {
   dessert: "Dessert", boisson: "Boisson", sauce: "Sauce", autre: "Autre",
 };
 
+// Livre fictif qui rassemble les recettes sans livre (sites, recettes perso…).
+export const TITRE_CARNET = "Le carnet de CuiCui";
+
 // Critères proposés pour classer la liste des recettes.
 export const CLASSEMENTS = [
   { valeur: "nom", libelle: "Nom" },
@@ -58,7 +61,7 @@ function criteres(livres) {
         const id = texteNettoye(recette.source?.livre);
         return id && { cle: id, titre: titresLivres.get(id) ?? texteNettoye(recette.source?.titre) ?? id };
       },
-      sansGroupe: "Sans livre",
+      sansGroupe: TITRE_CARNET,
     },
     categorie: {
       groupe: (recette) => {

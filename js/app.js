@@ -6,7 +6,7 @@ import { ouvrirStockage } from "./stockage.js";
 import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
 import {
-  CATEGORIES, CLASSEMENTS, STATUTS, classerRecettes, formaterIngredient, formaterInfos, formaterModification,
+  CATEGORIES, CLASSEMENTS, STATUTS, TITRE_CARNET, classerRecettes, formaterIngredient, formaterInfos, formaterModification,
   formaterSource, grouperIngredients, infosStatut, ingredientsPour, lireStatut, majuscule, modifier, nombrePersonnes,
   recetteEnTexte, trierParPage, valeurActuelle,
 } from "./recette.js";
@@ -16,7 +16,7 @@ import {
 } from "./courses.js";
 import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
 
-const VERSION = "0.17.6";
+const VERSION = "0.17.7";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -262,7 +262,14 @@ function couvertureLivre(idLivre, titre) {
   return cadre;
 }
 
-// Étagère : un livre par couverture, avec son nombre de recettes ; les recettes sans livre à la fin.
+// Couverture du carnet de CuiCui : une image de l'application, la même pour tous.
+function couvertureCarnet() {
+  return el("div", { class: "couverture" },
+    el("img", { src: "icones/carnet-cuicui.jpg", alt: `Couverture : ${TITRE_CARNET}` }));
+}
+
+// Étagère : un livre par couverture, avec son nombre de recettes ; les recettes sans livre à la fin,
+// dans « Le carnet de CuiCui », avec sa propre couverture.
 function etagere(entrees, livres) {
   const groupes = classerRecettes(entrees, "livre", livres.map((entree) => ({ id: entree.id, titre: entree.livre?.titre })));
   // Un livre du dépôt sans recette reste sur l'étagère.
@@ -275,7 +282,7 @@ function etagere(entrees, livres) {
   return el("ul", { class: "etagere" }, groupes.map((groupe) => el("li", {},
     el("a", { class: "etagere__livre", href: `#/livre/${encodeURIComponent(groupe.cle ?? "")}` },
       groupe.cle ? couvertureLivre(groupe.cle, groupe.titre)
-        : el("div", { class: "couverture couverture--vide" }, el("span", { class: "couverture__titre" }, "📖")),
+        : couvertureCarnet(),
       el("strong", { class: "etagere__titre" }, groupe.titre),
       el("span", { class: "discret" }, nombreRecettes(groupe.entrees.length))))));
 }
@@ -579,7 +586,7 @@ async function vueLivre(idLivre) {
     const [entrees, entreeLivre] = await Promise.all([stockage.lireRecettes(), idLivre ? stockage.lireLivre(idLivre) : null]);
     const recettes = entrees.filter((entree) => (entree.recette.source?.livre || "") === idLivre);
     const livre = entreeLivre?.livre ?? {};
-    const titre = idLivre ? livre.titre ?? recettes[0]?.recette.source?.titre ?? idLivre : "Sans livre";
+    const titre = idLivre ? livre.titre ?? recettes[0]?.recette.source?.titre ?? idLivre : TITRE_CARNET;
 
     if (idLivre && !entreeLivre && recettes.length === 0) {
       nomFige.textContent = "";
@@ -590,7 +597,7 @@ async function vueLivre(idLivre) {
     const publication = [livre.editeur, livre.annee].filter(Boolean).join(", ");
     contenu.replaceChildren(
       el("div", { class: "livre" },
-        idLivre ? couvertureLivre(idLivre, titre) : null,
+        idLivre ? couvertureLivre(idLivre, titre) : couvertureCarnet(),
         el("div", { class: "livre__infos" },
           el("h2", {}, titre),
           livre.sousTitre && el("p", {}, livre.sousTitre),

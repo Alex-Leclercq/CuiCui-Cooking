@@ -364,14 +364,6 @@ body {
   line-height: 1.25;
 }
 
-.couverture--vide {
-  border-style: dashed;
-  background: var(--surface);
-  color: var(--texte-doux);
-  font-size: 2rem;
-  box-shadow: none;
-}
-
 /* Écran d'un livre */
 
 .livre {
