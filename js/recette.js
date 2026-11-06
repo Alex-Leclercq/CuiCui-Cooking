@@ -20,9 +20,10 @@ export function lireStatut(recette) {
 
 export const infosStatut = (valeur) => STATUTS.find((statut) => statut.valeur === valeur);
 
-// Catégories, dans l'ordre d'un repas.
+// Catégories, dans l'ordre d'une journée et d'un repas.
 export const CATEGORIES = {
-  aperitif: "Apéritif", entree: "Entrée", plat: "Plat", accompagnement: "Accompagnement",
+  "petit-dejeuner": "Petit-déjeuner", aperitif: "Apéritif", entree: "Entrée", plat: "Plat",
+  accompagnement: "Accompagnement",
   dessert: "Dessert", boisson: "Boisson", sauce: "Sauce", autre: "Autre",
 };
 
