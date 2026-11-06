@@ -2,7 +2,7 @@
 // Changer CACHE à chaque version pour que les téléphones récupèrent
 // les nouveaux fichiers.
 
-const CACHE = "cuicui-v0.17.6";
+const CACHE = "cuicui-v0.17.7";
 
 const FICHIERS_APPLICATION = [
   "./",
@@ -17,6 +17,7 @@ const FICHIERS_APPLICATION = [
   "js/recherche.js",
   "manifest.webmanifest",
   "icones/icone.svg",
+  "icones/carnet-cuicui.jpg",
   "icones/icone-192.png",
   "icones/icone-512.png",
 ];

@@ -216,7 +216,7 @@ const tests = {
       entree("b", { source: { titre: "Autre livre", livre: "autre" } }),
       entree("c", { source: { type: "site", titre: "Marmiton" } }),
     ], "livre", [{ id: "mentor", titre: "Méthode Mentor" }]);
-    egal(groupes.map((g) => `${g.cle}:${g.titre}`).join(","), "autre:Autre livre,mentor:Méthode Mentor,null:Sans livre");
+    egal(groupes.map((g) => `${g.cle}:${g.titre}`).join(","), "autre:Autre livre,mentor:Méthode Mentor,null:Le carnet de CuiCui");
   },
 
   "Pluriel : le nom et ses adjectifs s'accordent, pas le complément"() {
