@@ -24,7 +24,7 @@ export const infosStatut = (valeur) => STATUTS.find((statut) => statut.valeur ==
 export const CATEGORIES = {
   "petit-dejeuner": "Petit-déjeuner", aperitif: "Apéritif", entree: "Entrée", plat: "Plat",
   accompagnement: "Accompagnement",
-  dessert: "Dessert", boisson: "Boisson", sauce: "Sauce", autre: "Autre",
+  dessert: "Dessert", gouter: "Goûter", boisson: "Boisson", sauce: "Sauce", autre: "Autre",
 };
 
 // Livre fictif qui rassemble les recettes sans livre (sites, recettes perso…).

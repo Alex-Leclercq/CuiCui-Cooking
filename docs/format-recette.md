@@ -40,7 +40,7 @@ Les photos sont compressées en JPEG avant d'être enregistrées, avec environ 1
 | `nom` | texte | oui | Nom de la recette. |
 | `chef` | texte | non | Chef ou auteur. |
 | `source` | objet | non | D'où vient la recette (voir ci-dessous). |
-| `categorie` | texte | oui | Une valeur parmi : `petit-dejeuner`, `aperitif`, `entree`, `plat`, `accompagnement`, `dessert`, `boisson`, `sauce`, `autre`. |
+| `categorie` | texte | oui | Une valeur parmi : `petit-dejeuner`, `aperitif`, `entree`, `plat`, `accompagnement`, `dessert`, `gouter`, `boisson`, `sauce`, `autre`. |
 | `cuisine` | texte | non | Ex. `française`, `italienne`, `japonaise`. |
 | `difficulte` | texte | non | `facile`, `moyen` ou `difficile`. |
 | `motsCles` | liste de textes | non | Mots-clés libres, en minuscules : `végétarien`, `rapide`, `hiver`… |
