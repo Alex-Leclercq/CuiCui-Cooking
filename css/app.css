@@ -1093,3 +1093,83 @@ body {
 .ecran-filtres .filtres__groupe {
   margin-bottom: 20px;
 }
+
+/* Ajout d'une recette en photo */
+.entete-vue__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.formulaire__choix {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  background: var(--fond);
+  color: var(--texte);
+  font: inherit;
+}
+
+.formulaire__choix:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.photos-envoi {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.photos-envoi:empty {
+  display: none;
+}
+
+.photo-envoi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.photo-envoi img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  background: var(--fond);
+}
+
+.photo-envoi figcaption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.photo-envoi .formulaire__choix {
+  flex: 1;
+  min-height: 40px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.envois {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.envois li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

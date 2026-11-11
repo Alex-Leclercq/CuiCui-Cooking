@@ -8,8 +8,11 @@ export function creerFauxGitHub() {
   const blobs = new Map();    // sha → texte
   let commit = null;
   let compteur = 0;
+  const arbres = new Map();   // sha → entrées ajoutées par l'application (API Git : photos à traiter)
+  const commits = new Map();  // sha → { arbre, parents, message }
   // photosEnPanne : seuls les téléchargements de photos échouent (connexion coupée en plein préchargement).
-  const etat = { horsLigne: false, photosEnPanne: false, appels: [] };
+  // avancerAvantMaj : un commit arrive « depuis le PC » juste avant la mise à jour de main par l'application.
+  const etat = { horsLigne: false, photosEnPanne: false, avancerAvantMaj: false, appels: [], messages: [] };
 
   const nouveauSha = () => `sha${++compteur}`;
 
@@ -50,6 +53,39 @@ export function creerFauxGitHub() {
       return reponse(200, { tree: arbre, truncated: false });
     }
 
+    // API Git : blobs, arbre, commit, puis déplacement de main (ajout de plusieurs fichiers en un commit).
+    if (route === "/git/blobs" && methode === "POST") {
+      const sha = nouveauSha();
+      blobs.set(sha, depuisBase64(JSON.parse(options.body).content));
+      return reponse(201, { sha });
+    }
+    if ((correspondance = route.match(/^\/git\/commits\/(.+)$/))) {
+      return reponse(200, { sha: correspondance[1], tree: { sha: `arbre-${correspondance[1]}` } });
+    }
+    if (route === "/git/trees" && methode === "POST") {
+      const sha = nouveauSha();
+      arbres.set(sha, JSON.parse(options.body).tree);
+      return reponse(201, { sha });
+    }
+    if (route === "/git/commits" && methode === "POST") {
+      const corps = JSON.parse(options.body);
+      const sha = nouveauSha();
+      commits.set(sha, { arbre: corps.tree, parents: corps.parents, message: corps.message });
+      return reponse(201, { sha });
+    }
+    if (route === "/git/refs/heads/main" && methode === "PATCH") {
+      if (etat.avancerAvantMaj) {
+        etat.avancerAvantMaj = false;
+        ecrire("recettes/pc/recette.json", JSON.stringify({ id: "pc", nom: "Depuis le PC" }));
+      }
+      const nouveau = commits.get(JSON.parse(options.body).sha);
+      if (!nouveau || nouveau.parents[0] !== commit) return reponse(422, { message: "Update is not a fast forward" });
+      for (const entree of arbres.get(nouveau.arbre)) fichiers.set(entree.path, { texte: blobs.get(entree.sha), sha: entree.sha });
+      commit = JSON.parse(options.body).sha;
+      etat.messages.push(nouveau.message);
+      return reponse(200, { object: { sha: commit } });
+    }
+
     if ((correspondance = route.match(/^\/git\/blobs\/(.+)$/))) {
       if (etat.photosEnPanne && brut) throw new TypeError("Failed to fetch");
       const contenu = blobs.get(correspondance[1]);
@@ -84,6 +120,7 @@ export function creerFauxGitHub() {
     ecrire,
     supprimer,
     lire: (chemin) => fichiers.get(chemin),
+    chemins: () => [...fichiers.keys()],
     etat,
   };
 }

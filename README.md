@@ -5,7 +5,12 @@
 ## Ce que fait l'application
 
 - **Mon carnet de recettes de poche :** je liste et consulte mes recettes préférées où que je sois, même sans connexion.
-- **Import par photo :** je prends en photo une recette trouvée dans un livre ou sur un site internet, et ses informations essentielles sont rapatriées dans l'application :
+- **Ajout d'une recette en photo (bouton 📷 Ajouter de Mes recettes, ou « Ajouter une recette de ce livre » sur l'écran d'un livre) :**
+  - je choisis le livre d'où vient la recette (le dernier choisi reste sélectionné, pour enchaîner les recettes d'un même livre), « Nouveau livre » ou « Pas un livre », puis la page si je la connais ;
+  - je prends les pages en photo avec l'appareil photo du téléphone, ou je les choisis dans la galerie (captures d'écran). Sous chaque photo, j'indique ce qu'elle montre : page de la recette, photo du plat (une seule), et pour un nouveau livre la page de copyright (ISBN, éditeur, année) ou la couverture ;
+  - **Envoyer** réduit les photos (JPEG, 1 600 px) et les dépose, en un seul commit, dans la boîte `a-traiter/` du dépôt des recettes. Sans réseau, elles attendent sur le téléphone et partent toutes seules au retour de la connexion ;
+  - la liste **Envois en attente** montre les photos pas encore envoyées (⏳) et celles qui attendent d'être transformées en fiche par Claude (📬). Un envoi disparaît de la liste une fois sa fiche créée.
+- **Ce que Claude extrait des photos :** sur le PC, je demande à Claude de « traiter les recettes en attente ». Il crée les fiches au format du carnet, cherche la couverture officielle d'un nouveau livre et, si possible, une version de meilleure qualité de la photo du plat, puis vide la boîte. Chaque fiche contient :
   - le nom de la recette ;
   - les ingrédients et leurs quantités ;
   - les étapes de préparation ;
@@ -38,7 +43,7 @@
 
 ## Deux façons d'importer une recette
 
-1. **Depuis l'application (OCR) :** je photographie la page, l'application reconnaît le texte sur le téléphone et pré-remplit le formulaire. Je vérifie et corrige les champs avant d'enregistrer.
+1. **Depuis l'application :** je photographie la page avec le téléphone ; les photos sont déposées dans la boîte `a-traiter/` du dépôt des recettes, et Claude les transforme en fiches à la demande, depuis le PC. Pas d'OCR sur le téléphone : la lecture par Claude est bien plus fiable (quantités, étapes, unités), et aucune clé ni aucun nouveau site n'est nécessaire.
 2. **Via Claude :** j'envoie des captures d'écran de la recette à Claude, depuis mon PC ou mon téléphone. Claude extrait tous les champs, crée la fiche au [format défini](docs/format-recette.md) et la pousse dans le dépôt des recettes.
 
 ## Choix techniques
@@ -68,6 +73,7 @@ GitHub (le dépôt `CuiCui-Recettes`) est la référence. Le téléphone en gard
 - **Envoi depuis le téléphone :** chaque modification (nouvelle recette, changement de statut, note…) est d'abord enregistrée sur le téléphone (IndexedDB), puis envoyée aussitôt à GitHub par l'API REST : GitHub crée lui-même le commit. Sans réseau, la modification attend dans une file d'attente et part automatiquement au retour de la connexion.
 - **Réception sur le téléphone :** à chaque ouverture, à chaque retour sur l'application, ou avec le bouton **Réglages → Synchronisation → Synchroniser**, l'application compare l'empreinte (SHA) du dernier commit de `main` avec celle de la dernière synchronisation. Si elle a changé, elle récupère la liste des fichiers du dépôt avec leurs empreintes et ne télécharge que les recettes dont l'empreinte a changé. Les recettes supprimées sur GitHub disparaissent du téléphone. Les fiches des livres (`livres/<id>/livre.json`) sont reçues de la même façon. Les couvertures et les photos du plat qui manquent sur le téléphone sont ensuite téléchargées en arrière-plan (trois à la fois, en binaire plutôt qu'en base64, et pas du tout si l'économiseur de données est activé) ; les photos d'origine (pages de livre) ne le sont qu'à leur première consultation. Toutes restent ensuite sur le téléphone. L'application demande au navigateur de protéger ces données pour qu'Android ne les efface pas quand la place manque ; l'état de cette protection est affiché dans **Réglages → À propos**.
 - **Où voir l'état :** la synchronisation est automatique et n'apparaît pas sur la page des recettes. En haut de l'écran, un badge signale les modifications en attente, un conflit ou une erreur (« ⚠️ Synchro ») ; un appui dessus ouvre les Réglages.
+- **Photos de recettes :** chaque envoi part en un seul commit (API Git de GitHub : fichiers, arborescence, commit, puis déplacement de `main`) dans `a-traiter/<date-heure>/`, avec un fichier `demande.json` (livre, page, rôle de chaque photo). Si `main` a avancé pendant l'envoi, le commit est refait par-dessus. L'envoi ne quitte le téléphone qu'une fois le commit fait. La synchronisation ignore ce dossier pour les recettes ; elle s'en sert seulement pour lister les envois en attente de traitement.
 - **Ajout depuis le PC :** Claude récupère d'abord la dernière version du dépôt (`git pull`), crée les fiches, puis pousse sur `main`. Les recettes arrivent sur le téléphone à sa prochaine synchronisation.
 - **Conflits :** chaque envoi indique la version du fichier connue par le téléphone. Si le fichier a changé entre-temps, GitHub refuse (erreur 409). L'application fusionne alors les changements ou me demande de choisir. Rien n'est écrasé en silence.
 
@@ -107,6 +113,7 @@ Recommandations pour le compte GitHub : activer la **double authentification (2F
 | `js/synchro.js` | La synchronisation : envoi, réception, fusion et conflits. |
 | `js/recette.js` | La mise en forme d'une recette en texte (quantités, durées, texte partagé). |
 | `js/courses.js` | La liste de courses : ingrédients de chaque recette, articles cochés, texte partagé. |
+| `js/envoi.js` | L'ajout d'une recette en photo : rôle et nom des photos, réduction, contenu de `demande.json`. |
 | `tests/` | Les tests : synchronisation (avec un faux GitHub en mémoire), mise en forme des recettes et liste de courses. |
 | `sw.js` | Le « service worker » qui garde l'application en mémoire pour l'utiliser hors ligne. |
 | `manifest.webmanifest` | La carte d'identité de l'application (nom, icône, couleurs), qui permet de l'installer sur le téléphone. |
@@ -159,5 +166,5 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [x] Garder l'écran allumé en cuisine
 - [x] Ajouter des notes personnelles
 - [x] Générer une liste de courses à partir de plusieurs recettes
-- [ ] Importer une recette à partir d'une photo (OCR)
+- [x] Ajouter une recette à partir d'une photo (boîte `a-traiter/`, fiches créées par Claude)
 - [ ] Importer des recettes via Claude à partir de captures d'écran

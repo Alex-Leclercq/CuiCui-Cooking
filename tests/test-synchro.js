@@ -5,6 +5,9 @@ import { ouvrirStockage } from "../js/stockage.js";
 import { creerClientGitHub } from "../js/github.js";
 import { creerSynchro, fusionner } from "../js/synchro.js";
 import { creerFauxGitHub } from "./faux-github.js";
+import {
+  creerDemande, decrireDemande, dimensionsReduites, identifiantEnvoi, nommerPhotos, verifierEnvoi,
+} from "../js/envoi.js";
 
 const NOM_BASE = "cuicui-tests";
 const chemin = (id) => `recettes/${id}/recette.json`;
@@ -435,6 +438,106 @@ tests["Nouvelle version ouverte ailleurs → la base est libérée"] = async () 
   verifier(prevenu, "l'application doit être prévenue");
   plusRecente.close();
   await new Promise((ok) => { const d = indexedDB.deleteDatabase(nom); d.onsuccess = d.onerror = d.onblocked = () => ok(); });
+};
+
+// ---- Ajout d'une recette en photo ----
+
+const livreSimple = { type: "existant", id: "ottolenghi-simple", titre: "Simple" };
+const photoTest = (texteImage) => new Blob([texteImage], { type: "image/jpeg" });
+
+tests["Envoi : noms des photos selon leur rôle"] = () => {
+  const noms = nommerPhotos(["recette", "recette", "plat", "copyright", "couverture", "couverture"]);
+  verifier(noms.join() === "recette-1.jpg,recette-2.jpg,plat.jpg,copyright.jpg,couverture-1.jpg,couverture-2.jpg", noms.join());
+};
+
+tests["Envoi : vérifications avant l'envoi"] = () => {
+  verifier(verifierEnvoi({ roles: [], livre: livreSimple }), "aucune photo : refus attendu");
+  verifier(verifierEnvoi({ roles: ["plat"], livre: livreSimple }), "pas de page de recette : refus attendu");
+  verifier(verifierEnvoi({ roles: ["recette", "plat", "plat"], livre: livreSimple }), "deux photos du plat : refus attendu");
+  verifier(verifierEnvoi({ roles: ["recette", "copyright"], livre: livreSimple }), "copyright sans nouveau livre : refus attendu");
+  verifier(verifierEnvoi({ roles: ["recette", "copyright"], livre: { type: "nouveau" } }) === null, "nouveau livre : accepté");
+  verifier(verifierEnvoi({ roles: ["recette", "plat"], livre: { type: "aucun" } }) === null, "hors livre : accepté");
+};
+
+tests["Envoi : demande, réduction et identifiant"] = () => {
+  const date = new Date(2026, 10, 11, 15, 30, 12);
+  const demande = creerDemande({ date, livre: livreSimple, page: 42, roles: ["recette", "plat"] });
+  verifier(demande.livre === "ottolenghi-simple" && demande.titreLivre === "Simple" && demande.page === 42, JSON.stringify(demande));
+  verifier(demande.photos[1].fichier === "plat.jpg" && demande.photos[1].role === "plat", JSON.stringify(demande.photos));
+  const horsLivre = creerDemande({ date, livre: { type: "aucun" }, page: 42, roles: ["recette"] });
+  verifier(horsLivre.page === null && horsLivre.livre === null && !horsLivre.nouveauLivre, "hors livre : pas de page");
+  verifier(creerDemande({ date, livre: livreSimple, page: NaN, roles: ["recette"] }).page === null, "page vide → null");
+  const reduite = dimensionsReduites(4000, 3000);
+  verifier(reduite.largeur === 1600 && reduite.hauteur === 1200, JSON.stringify(reduite));
+  verifier(dimensionsReduites(800, 600).largeur === 800, "une petite photo n'est pas agrandie");
+  verifier(identifiantEnvoi(date, () => 0.5) === "2026-11-11-153012-8000", identifiantEnvoi(date, () => 0.5));
+};
+
+tests["Photos : déposées en un seul commit dans a-traiter/, puis listées"] = async () => {
+  const { synchro, stockage, github } = await environnement();
+  github.ecrire("recettes/a/recette.json", texte(recette("a")));
+  await synchro.synchroniser();
+  const demande = creerDemande({ date: new Date(), livre: livreSimple, page: 12, roles: ["recette", "plat"] });
+  await synchro.deposerPhotos("2026-11-11-153012-abcd", demande,
+    [{ fichier: "recette-1.jpg", image: photoTest("page") }, { fichier: "plat.jpg", image: photoTest("plat") }]);
+
+  const dossier = "a-traiter/2026-11-11-153012-abcd";
+  verifier(github.lire(`${dossier}/recette-1.jpg`)?.texte === "page", "page de la recette absente");
+  verifier(github.lire(`${dossier}/plat.jpg`)?.texte === "plat", "photo du plat absente");
+  verifier(JSON.parse(github.lire(`${dossier}/demande.json`).texte).page === 12, "demande.json absente ou fausse");
+  verifier(github.etat.messages.length === 1 && github.etat.messages[0].includes("Simple"), github.etat.messages.join(" | "));
+  verifier((await stockage.lireEnvois()).length === 0, "l'envoi doit quitter le téléphone");
+  const envois = await synchro.lireEnvois();
+  verifier(envois.length === 1 && envois[0].statut === "a-traiter" && envois[0].demande?.titreLivre === "Simple",
+    JSON.stringify(envois));
+  verifier((await stockage.lireRecettes()).length === 1, "la recette existante doit rester");
+
+  // Claude traite l'envoi sur le PC : le dossier disparaît, la liste se vide.
+  for (const chemin of github.chemins().filter((c) => c.startsWith(dossier))) github.supprimer(chemin);
+  await synchro.synchroniser();
+  verifier((await synchro.lireEnvois()).length === 0, "l'envoi traité ne doit plus être listé");
+  verifier(((await stockage.lireMeta("envoisRecents")) ?? []).length === 0, "le résumé de l'envoi doit être oublié");
+};
+
+tests["Photos hors ligne : gardées sur le téléphone, envoyées au retour du réseau"] = async () => {
+  const { synchro, stockage, github } = await environnement();
+  github.ecrire("recettes/a/recette.json", texte(recette("a")));
+  await synchro.synchroniser();
+  github.etat.horsLigne = true;
+  const demande = creerDemande({ date: new Date(), livre: { type: "aucun" }, page: null, roles: ["recette"] });
+  await synchro.deposerPhotos("2026-11-11-160000-0001", demande, [{ fichier: "recette-1.jpg", image: photoTest("hors ligne") }]);
+  let envois = await synchro.lireEnvois();
+  verifier(envois.length === 1 && envois[0].statut === "envoi", JSON.stringify(envois));
+  verifier((await synchro.lireEtat()).enAttente === 1, "l'envoi doit compter dans les modifications en attente");
+
+  github.etat.horsLigne = false;
+  await synchro.synchroniser();
+  verifier(github.lire("a-traiter/2026-11-11-160000-0001/recette-1.jpg")?.texte === "hors ligne", "photo non envoyée");
+  envois = await synchro.lireEnvois();
+  verifier(envois.length === 1 && envois[0].statut === "a-traiter", JSON.stringify(envois));
+};
+
+tests["Photos : main a avancé pendant l'envoi → commit refait, rien n'est perdu"] = async () => {
+  const { synchro, stockage, github } = await environnement();
+  github.ecrire("recettes/a/recette.json", texte(recette("a")));
+  await synchro.synchroniser();
+  github.etat.avancerAvantMaj = true;
+  const demande = creerDemande({ date: new Date(), livre: { type: "nouveau" }, page: null, roles: ["recette", "copyright"] });
+  await synchro.deposerPhotos("2026-11-11-170000-0002", demande,
+    [{ fichier: "recette-1.jpg", image: photoTest("p") }, { fichier: "copyright.jpg", image: photoTest("c") }]);
+  verifier(github.lire("a-traiter/2026-11-11-170000-0002/copyright.jpg")?.texte === "c", "photo non envoyée");
+  verifier(github.lire("recettes/pc/recette.json"), "la recette ajoutée depuis le PC doit rester");
+  verifier((await stockage.lireRecettes()).some((entree) => entree.id === "pc"), "la recette du PC doit arriver sur le téléphone");
+};
+
+tests["Photos : envoi depuis un autre appareil → listé sans description"] = async () => {
+  const { synchro, github } = await environnement();
+  github.ecrire("a-traiter/2026-11-10-080000-ffff/recette-1.jpg", "x");
+  github.ecrire("a-traiter/2026-11-10-080000-ffff/demande.json", texte({ photos: [] }));
+  await synchro.synchroniser();
+  const envois = await synchro.lireEnvois();
+  verifier(envois.length === 1 && envois[0].demande === null && envois[0].statut === "a-traiter", JSON.stringify(envois));
+  verifier(decrireDemande(null).includes("autre appareil"), decrireDemande(null));
 };
 
 const lignes = [];

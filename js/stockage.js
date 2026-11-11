@@ -4,9 +4,10 @@
 // - livres   : copie locale des livres de recettes { id, livre, sha, fichiers } ;
 // - attente  : modifications pas encore envoyées à GitHub, une par recette ;
 // - meta     : réglages (dépôt, jeton) et état de la synchronisation ;
-// - photos   : photos et couvertures téléchargées, rangées par empreinte (sha) pour rester disponibles hors ligne.
+// - photos   : photos et couvertures téléchargées, rangées par empreinte (sha) pour rester disponibles hors ligne ;
+// - envois   : photos de recettes prises sur le téléphone, pas encore déposées dans « a-traiter/ » sur GitHub.
 
-const VERSION_BASE = 3;
+const VERSION_BASE = 4;
 
 // siBloque : appelé si une autre fenêtre de l'application, restée sur une ancienne version,
 // empêche la mise à niveau de la base. L'ouverture reprend d'elle-même dès qu'elle est fermée.
@@ -23,6 +24,7 @@ export function ouvrirStockage(nom = "cuicui", { version = VERSION_BASE, siBloqu
       if (!existe("attente")) base.createObjectStore("attente", { keyPath: "id" });
       if (!existe("meta")) base.createObjectStore("meta");
       if (!existe("photos")) base.createObjectStore("photos");
+      if (!existe("envois")) base.createObjectStore("envois", { keyPath: "id" });
       if (!existe("livres")) {
         base.createObjectStore("livres", { keyPath: "id" });
         // Le dépôt peut déjà contenir des livres : on oublie le dernier commit synchronisé pour
@@ -86,6 +88,10 @@ function creerStockage(base) {
     lirePhoto: (sha) => lire("photos", sha),
     lireEmpreintesPhotos: () => lireCles("photos"),
     ecrirePhoto: (sha, photo) => ecrire("photos", photo, sha),
+
+    lireEnvois: () => lireTout("envois"),
+    ecrireEnvoi: (envoi) => ecrire("envois", envoi),
+    supprimerEnvoi: (id) => supprimer("envois", id),
 
     fermer: () => base.close(),
   };

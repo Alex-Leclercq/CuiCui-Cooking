@@ -32,11 +32,18 @@ function messageErreur(statut) {
   }
 }
 
+// Encodage base64 d'octets (photo…), par morceaux pour ne pas dépasser la limite d'arguments.
+export function octetsVersBase64(octets) {
+  let binaire = "";
+  for (let debut = 0; debut < octets.length; debut += 0x8000) {
+    binaire += String.fromCharCode(...octets.subarray(debut, debut + 0x8000));
+  }
+  return btoa(binaire);
+}
+
 // Encodage base64 du texte en UTF-8 (accents, emojis…), comme l'attend l'API.
 export function versBase64(texte) {
-  let binaire = "";
-  for (const octet of new TextEncoder().encode(texte)) binaire += String.fromCharCode(octet);
-  return btoa(binaire);
+  return octetsVersBase64(new TextEncoder().encode(texte));
 }
 
 export function depuisBase64(base64) {
@@ -71,6 +78,16 @@ export function creerClientGitHub({ proprietaire, depot, jeton, fetch: appeler =
     return brut ? reponse.arrayBuffer() : reponse.json();
   }
 
+  // Empreinte (SHA) du dernier commit de la branche, ou null si le dépôt est vide.
+  async function dernierCommit(branche = "main") {
+    try {
+      return (await requete(`/git/ref/heads/${branche}`)).object.sha;
+    } catch (erreur) {
+      if (erreur.statut === 409) return null; // « Git Repository is empty »
+      throw erreur;
+    }
+  }
+
   return {
     // Vérifie que le dépôt est accessible avec ce jeton.
     async verifier() {
@@ -78,13 +95,33 @@ export function creerClientGitHub({ proprietaire, depot, jeton, fetch: appeler =
       return { nomComplet: infos.full_name, prive: infos.private };
     },
 
-    // Empreinte (SHA) du dernier commit de la branche, ou null si le dépôt est vide.
-    async dernierCommit(branche = "main") {
-      try {
-        return (await requete(`/git/ref/heads/${branche}`)).object.sha;
-      } catch (erreur) {
-        if (erreur.statut === 409) return null; // « Git Repository is empty »
-        throw erreur;
+    dernierCommit,
+
+    // Ajoute plusieurs fichiers (photos…) en un seul commit sur main.
+    // fichiers : [{ chemin, contenu }], contenu étant du texte ou des octets (Uint8Array).
+    // Si main a avancé entre-temps (autre appareil, PC), le commit est refait par-dessus.
+    async ajouterFichiers(fichiers, message, branche = "main") {
+      const entrees = [];
+      for (const { chemin, contenu } of fichiers) {
+        const base64 = typeof contenu === "string" ? versBase64(contenu) : octetsVersBase64(contenu);
+        const { sha } = await requete("/git/blobs", { methode: "POST", corps: { content: base64, encoding: "base64" } });
+        entrees.push({ path: chemin, mode: "100644", type: "blob", sha });
+      }
+      for (let essai = 1; ; essai++) {
+        const parent = await dernierCommit(branche);
+        if (!parent) throw new ErreurGitHub("Le dépôt des recettes est vide.", 409);
+        const arbreParent = (await requete(`/git/commits/${parent}`)).tree.sha;
+        const arbre = await requete("/git/trees", { methode: "POST", corps: { base_tree: arbreParent, tree: entrees } });
+        const commit = await requete("/git/commits", {
+          methode: "POST", corps: { message, tree: arbre.sha, parents: [parent] },
+        });
+        try {
+          await requete(`/git/refs/heads/${branche}`, { methode: "PATCH", corps: { sha: commit.sha } });
+          return { commit: commit.sha };
+        } catch (erreur) {
+          // 422 : « not a fast forward », la branche a bougé pendant l'envoi.
+          if (erreur.statut !== 422 || essai >= 3) throw erreur;
+        }
       }
     },
 
