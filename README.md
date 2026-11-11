@@ -5,7 +5,7 @@
 ## Ce que fait l'application
 
 - **Mon carnet de recettes de poche :** je liste et consulte mes recettes préférées où que je sois, même sans connexion.
-- **Ajout d'une recette en photo (bouton 📷 Ajouter de Mes recettes, ou « Ajouter une recette de ce livre » sur l'écran d'un livre) :**
+- **Ajout d'une recette en photo (bouton 📷 Ajouter en haut de Mes recettes) :**
   - je choisis le livre d'où vient la recette (le dernier choisi reste sélectionné, pour enchaîner les recettes d'un même livre), « Nouveau livre » ou « Pas un livre », puis la page si je la connais ;
   - je prends les pages en photo avec l'appareil photo du téléphone, ou je les choisis dans la galerie (captures d'écran). Sous chaque photo, j'indique ce qu'elle montre : page de la recette, photo du plat (une seule), et pour un nouveau livre la page de copyright (ISBN, éditeur, année) ou la couverture ;
   - **Envoyer** réduit les photos (JPEG, 1 600 px) et les dépose, en un seul commit, dans la boîte `a-traiter/` du dépôt des recettes. Sans réseau, elles attendent sur le téléphone et partent toutes seules au retour de la connexion ;
