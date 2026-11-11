@@ -7,7 +7,10 @@
 // - Conflits : GitHub refuse une écriture basée sur une version périmée. On fusionne alors
 //   champ par champ ; si les deux côtés ont modifié le même champ, l'utilisateur choisit.
 
+import { DOSSIER_A_TRAITER, messageEnvoi } from "./envoi.js";
+
 const DOSSIER_RECETTE = /^recettes\/([^/]+)\/([^/]+)$/;
+const DEMANDE_A_TRAITER = new RegExp(`^${DOSSIER_A_TRAITER}/([^/]+)/demande\\.json$`);
 const DOSSIER_LIVRE = /^livres\/([^/]+)\/([^/]+)$/;
 const cheminRecette = (id) => `recettes/${id}/recette.json`;
 const versTexte = (recette) => JSON.stringify(recette, null, 2) + "\n";
@@ -68,6 +71,26 @@ export function creerSynchro({ stockage, creerClient }) {
     }
   }
 
+  // Photos de recettes : chaque envoi part en un seul commit dans « a-traiter/<id>/ »,
+  // photos et demande.json ensemble. Il n'est retiré du téléphone qu'une fois le commit fait.
+  async function envoyerPhotos(github) {
+    const envois = (await stockage.lireEnvois()).sort((a, b) => a.date - b.date);
+    for (const { id, demande, photos } of envois) {
+      const dossier = `${DOSSIER_A_TRAITER}/${id}`;
+      const fichiers = [];
+      for (const { fichier, image } of photos) {
+        fichiers.push({ chemin: `${dossier}/${fichier}`, contenu: new Uint8Array(await image.arrayBuffer()) });
+      }
+      fichiers.push({ chemin: `${dossier}/demande.json`, contenu: versTexte(demande) });
+      await github.ajouterFichiers(fichiers, messageEnvoi(demande));
+      // Gardé en mémoire (sans les photos) pour décrire l'envoi tant que Claude ne l'a pas traité.
+      const recents = (await stockage.lireMeta("envoisRecents")) ?? [];
+      await stockage.ecrireMeta("envoisRecents", [...recents.filter((envoi) => envoi.id !== id), { id, demande }]);
+      await stockage.supprimerEnvoi(id);
+      notifier("modification");
+    }
+  }
+
   async function traiterConflit(github, operation, message) {
     const chemin = cheminRecette(operation.id);
     const distant = await github.lireFichier(chemin);
@@ -111,7 +134,18 @@ export function creerSynchro({ stockage, creerClient }) {
     const arbre = commit ? await github.arborescence(commit) : [];
     await recevoirRecettes(github, parDossier(arbre, DOSSIER_RECETTE, "recette.json"));
     await recevoirLivres(github, parDossier(arbre, DOSSIER_LIVRE, "livre.json"));
+    await recevoirATraiter(arbre);
     await stockage.ecrireMeta("dernierCommit", commit);
+  }
+
+  // Envois encore dans la boîte « a-traiter/ » (pas encore transformés en fiches par Claude).
+  async function recevoirATraiter(arbre) {
+    const ids = arbre
+      .map((fichier) => fichier.type === "blob" && fichier.path.match(DEMANDE_A_TRAITER)?.[1])
+      .filter(Boolean);
+    await stockage.ecrireMeta("aTraiter", ids);
+    const recents = (await stockage.lireMeta("envoisRecents")) ?? [];
+    await stockage.ecrireMeta("envoisRecents", recents.filter((envoi) => ids.includes(envoi.id)));
   }
 
   // Pour chaque dossier (recette ou livre) : l'empreinte de sa fiche et celles de ses autres fichiers (photos).
@@ -285,6 +319,7 @@ export function creerSynchro({ stockage, creerClient }) {
     notifier("debut");
     try {
       await envoyer(github);
+      await envoyerPhotos(github);
       await recuperer(github);
       derniereErreur = null;
       await stockage.ecrireMeta("derniereSynchro", Date.now());
@@ -346,6 +381,26 @@ export function creerSynchro({ stockage, creerClient }) {
       return synchroniser().catch(() => {});
     },
 
+    // Dépose des photos de recette : enregistrées sur le téléphone, puis envoyées dès que possible.
+    // photos : [{ fichier, image (Blob) }], dans l'ordre de demande.photos. Renvoie l'identifiant de l'envoi,
+    // après la tentative d'envoi, sans jamais échouer.
+    async deposerPhotos(id, demande, photos) {
+      await stockage.ecrireEnvoi({ id, date: Date.now(), demande, photos });
+      notifier("modification");
+      await synchroniser().catch(() => {});
+      return id;
+    },
+
+    // Envois du plus récent au plus ancien : { id, demande, statut } avec statut
+    // « envoi » (encore sur le téléphone) ou « a-traiter » (sur GitHub, en attente de Claude).
+    async lireEnvois() {
+      const locaux = (await stockage.lireEnvois()).map(({ id, demande }) => ({ id, demande, statut: "envoi" }));
+      const recents = new Map(((await stockage.lireMeta("envoisRecents")) ?? []).map((envoi) => [envoi.id, envoi.demande]));
+      const distants = ((await stockage.lireMeta("aTraiter")) ?? [])
+        .map((id) => ({ id, demande: recents.get(id) ?? null, statut: "a-traiter" }));
+      return [...locaux, ...distants].sort((a, b) => b.id.localeCompare(a.id));
+    },
+
     // Après un conflit : garder la version du téléphone ("locale") ou celle de GitHub ("distante").
     async choisirVersion(id, choix) {
       const operation = await stockage.lireAttente(id);
@@ -375,7 +430,7 @@ export function creerSynchro({ stockage, creerClient }) {
       const changementDepot = precedente &&
         (precedente.proprietaire !== config.proprietaire || precedente.depot !== config.depot);
       if (changementDepot) {
-        if ((await stockage.lireToutesAttentes()).length) {
+        if ((await stockage.lireToutesAttentes()).length || (await stockage.lireEnvois()).length) {
           throw new Error("Des modifications attendent encore d'être envoyées à l'ancien dépôt.");
         }
         await stockage.viderRecettes();
@@ -401,12 +456,13 @@ export function creerSynchro({ stockage, creerClient }) {
 
     async lireEtat() {
       const operations = await stockage.lireToutesAttentes();
+      const envois = await stockage.lireEnvois();
       return {
         configure: !!(await stockage.lireMeta("config"))?.jeton,
         enCours: !!enCours,
         derniereErreur,
         derniereSynchro: await stockage.lireMeta("derniereSynchro"),
-        enAttente: operations.length,
+        enAttente: operations.length + envois.length,
         conflits: operations.filter((operation) => operation.conflit),
       };
     },

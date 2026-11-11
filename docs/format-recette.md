@@ -32,6 +32,42 @@ recettes/
 
 Les photos sont compressées en JPEG avant d'être enregistrées, avec environ 1600 px sur le plus grand côté.
 
+### Boîte des photos à traiter
+
+Les photos prises avec l'application arrivent dans `a-traiter/`, un dossier par envoi :
+
+```
+a-traiter/
+  2026-11-11-153012-a3f9/
+    demande.json      ← ce que l'utilisateur a indiqué
+    recette-1.jpg     ← page(s) de la recette
+    plat.jpg          ← photo du plat (facultative)
+    copyright.jpg     ← nouveau livre : page de copyright (facultative)
+    couverture.jpg    ← nouveau livre : couverture (facultative)
+```
+
+`demande.json` :
+
+```json
+{
+  "date": "2026-11-11T14:30:12.000Z",
+  "livre": "ottolenghi-simple",
+  "titreLivre": "Simple",
+  "nouveauLivre": false,
+  "page": 42,
+  "photos": [
+    { "fichier": "recette-1.jpg", "role": "recette" },
+    { "fichier": "plat.jpg", "role": "plat" }
+  ]
+}
+```
+
+- `livre` : identifiant d'un livre existant, ou `null` (nouveau livre ou recette hors livre).
+- `nouveauLivre` : `true` si la recette vient d'un livre absent du carnet.
+- `role` : `recette`, `plat`, `copyright` ou `couverture`.
+
+Une fois les fiches créées, le dossier de l'envoi est supprimé : les pages de la recette deviennent `source-1.jpg`, `source-2.jpg`… de la recette.
+
 ## Contenu de `recette.json`
 
 | Champ | Type | Obligatoire | Description |

@@ -15,8 +15,12 @@ import {
   plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
+import {
+  QUALITE_JPEG, ROLES, ROLES_NOUVEAU_LIVRE, creerDemande, decrireDemande, dimensionsReduites, identifiantEnvoi,
+  verifierEnvoi,
+} from "./envoi.js";
 
-const VERSION = "0.17.8";
+const VERSION = "0.18.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -527,7 +531,8 @@ async function vueRecettes() {
     if (entrees.length === 0) {
       liste.replaceChildren(statut.configure
         ? pageVide("📖", "Aucune recette dans le dépôt.",
-          "Ajoutez-en depuis le téléphone ou en envoyant des captures à Claude.")
+          "Photographiez une recette avec l'application, ou envoyez des captures à Claude.",
+          el("a", { href: "#/photo", class: "bouton" }, "📷 Ajouter une recette en photo"))
         : pageVide("📖", "Aucune recette pour l'instant.",
           "Connectez l'application à votre dépôt de recettes dans les Réglages.",
           el("a", { href: "#/reglages", class: "bouton" }, "Aller aux Réglages")));
@@ -561,7 +566,8 @@ async function vueRecettes() {
 
   await rafraichir();
   vueListe.append(
-    enteteFige(ligneTitre("Mes recettes", compteur), barreClassement, barreRecherche),
+    enteteFige(ligneTitre("Mes recettes", el("span", { class: "entete-vue__actions" }, compteur, lienAjoutPhoto())),
+      barreClassement, barreRecherche),
     selection.message, liste, selection.barre);
   return {
     contenu: el("div", {}, vueListe, ecranFiltres),
@@ -603,7 +609,8 @@ async function vueLivre(idLivre) {
           livre.sousTitre && el("p", {}, livre.sousTitre),
           livre.auteur && el("p", {}, el("strong", {}, livre.auteur)),
           publication && el("p", { class: "discret" }, publication),
-          el("p", { class: "discret" }, nombreRecettes(recettes.length)))),
+          el("p", { class: "discret" }, nombreRecettes(recettes.length)),
+          idLivre && entreeLivre && lienAjoutPhoto(idLivre, "📷 Ajouter une recette de ce livre"))),
       idLivre
         ? cartesRecettes(trierParPage(recettes), ({ source }) => (source?.page ? `p. ${source.page}` : ""))
         : cartesRecettes(classerRecettes(recettes, "nom")[0]?.entrees ?? []));
@@ -1187,6 +1194,236 @@ async function vueCourses() {
   return { contenu: el("div", {}, enteteFige(ligneTitre("Liste de courses", compteur)), contenu), rafraichir };
 }
 
+// ---- Ajout d'une recette en photo ----
+// Les photos sont réduites (1 600 px, JPEG) sur le téléphone, puis déposées dans la boîte « a-traiter/ »
+// du dépôt, avec le livre et la page. Claude les transforme ensuite en fiches (voir README).
+
+const CLE_DERNIER_LIVRE = "cuicui.dernierLivre";
+let livreDemande = null; // livre choisi d'avance, depuis l'écran d'un livre
+
+function lienAjoutPhoto(idLivre = null, texte = "📷 Ajouter") {
+  return el("a", {
+    href: "#/photo", class: "bouton bouton--secondaire bouton--petit",
+    "aria-label": idLivre ? null : "Ajouter une recette en photo",
+    onclick: () => { livreDemande = idLivre; },
+  }, texte);
+}
+
+// Photo du téléphone → JPEG réduit, redressé selon l'orientation de la prise de vue.
+async function preparerPhoto(fichier) {
+  const image = await createImageBitmap(fichier, { imageOrientation: "from-image" });
+  const { largeur, hauteur } = dimensionsReduites(image.width, image.height);
+  const toile = el("canvas", { width: largeur, height: hauteur });
+  toile.getContext("2d").drawImage(image, 0, 0, largeur, hauteur);
+  image.close();
+  return new Promise((resoudre, rejeter) => toile.toBlob(
+    (blob) => (blob ? resoudre(blob) : rejeter(new Error("Photo illisible."))), "image/jpeg", QUALITE_JPEG));
+}
+
+function lireDernierLivre() {
+  try {
+    return localStorage.getItem(CLE_DERNIER_LIVRE);
+  } catch {
+    return null;
+  }
+}
+
+function retenirDernierLivre(valeur) {
+  try {
+    localStorage.setItem(CLE_DERNIER_LIVRE, valeur);
+  } catch {
+    // Stockage indisponible : le livre sera simplement à choisir de nouveau.
+  }
+}
+
+async function vuePhoto() {
+  const statut = await synchro.lireEtat();
+  const entete = enteteFige(el("div", { class: "entete-vue__barre" },
+    boutonRetour(), el("strong", { class: "entete-vue__nom" }, "Ajouter une recette en photo")));
+  if (!statut.configure) {
+    return {
+      contenu: el("div", {}, entete, pageVide("🔑", "Application non connectée à GitHub.",
+        "Les photos sont envoyées dans votre dépôt de recettes : connectez-le d'abord dans les Réglages.",
+        el("a", { href: "#/reglages", class: "bouton" }, "Aller aux Réglages"))),
+    };
+  }
+
+  const livres = (await stockage.lireLivres())
+    .map((entree) => ({ id: entree.id, titre: String(entree.livre?.titre ?? entree.id) }))
+    .sort((a, b) => a.titre.localeCompare(b.titre, "fr"));
+  const photos = []; // { image (Blob), url (aperçu), role }
+
+  // Livre : le dernier choisi reste sélectionné, pour enchaîner les recettes d'un même livre.
+  const choixLivre = el("select", { id: "livre-envoi", class: "formulaire__choix" },
+    el("option", { value: "aucun" }, "Pas un livre (site, magazine, capture…)"),
+    el("option", { value: "nouveau" }, "➕ Nouveau livre"),
+    livres.map((livre) => el("option", { value: `livre:${livre.id}` }, livre.titre)));
+  const valeurInitiale = livreDemande ? `livre:${livreDemande}` : lireDernierLivre();
+  livreDemande = null;
+  choixLivre.value = [...choixLivre.options].some((option) => option.value === valeurInitiale) ? valeurInitiale : "aucun";
+  const aideNouveauLivre = el("p", { class: "discret" },
+    "Ajoutez une photo de la page de copyright (au dos de la page de titre : ISBN, éditeur, année). "
+    + "La couverture officielle sera cherchée en ligne ; une photo de la couverture sert de secours.");
+  const champPage = el("input", { id: "page-envoi", type: "number", inputmode: "numeric", min: "1", step: "1", placeholder: "Facultatif" });
+  const zonePage = el("label", { class: "champ", for: "page-envoi" }, el("span", {}, "Page"), champPage);
+
+  const livreChoisi = () => {
+    const valeur = choixLivre.value;
+    if (valeur === "aucun" || valeur === "nouveau") return { type: valeur };
+    const id = valeur.slice("livre:".length);
+    return { type: "existant", id, titre: livres.find((livre) => livre.id === id)?.titre ?? null };
+  };
+
+  // Photos : appareil photo du téléphone (une à la fois) ou galerie (plusieurs, captures d'écran…).
+  const entreeAppareil = el("input", { type: "file", accept: "image/*", capture: "environment", hidden: true });
+  const entreeGalerie = el("input", { type: "file", accept: "image/*", multiple: true, hidden: true });
+  const grille = el("div", { class: "photos-envoi" });
+  const message = el("p", { class: "message", role: "status" });
+  const boutonEnvoyer = el("button", { type: "button", class: "bouton" }, "Envoyer");
+
+  const afficherMessage = (texte, type) => {
+    message.textContent = texte;
+    message.className = `message message--${type}`;
+  };
+
+  async function ajouterPhotos(fichiers) {
+    if (!fichiers.length) return;
+    afficherMessage("Préparation des photos…", "info");
+    for (const fichier of fichiers) {
+      try {
+        const image = await preparerPhoto(fichier);
+        photos.push({ image, url: URL.createObjectURL(image), role: "recette" });
+      } catch {
+        notifier("Impossible de lire une des photos.", "erreur");
+      }
+    }
+    afficherMessage("", "info");
+    dessinerPhotos();
+  }
+  for (const entree of [entreeAppareil, entreeGalerie]) {
+    entree.addEventListener("change", () => {
+      const fichiers = [...entree.files];
+      entree.value = ""; // la même photo pourra être choisie de nouveau
+      ajouterPhotos(fichiers);
+    });
+  }
+
+  function retirerPhoto(index) {
+    URL.revokeObjectURL(photos[index].url);
+    photos.splice(index, 1);
+    dessinerPhotos();
+  }
+
+  function dessinerPhotos() {
+    const nouveau = choixLivre.value === "nouveau";
+    aideNouveauLivre.hidden = !nouveau;
+    zonePage.hidden = choixLivre.value === "aucun";
+    // Couverture et page de copyright n'ont de sens que pour un nouveau livre.
+    if (!nouveau) for (const photo of photos) if (ROLES_NOUVEAU_LIVRE.includes(photo.role)) photo.role = "recette";
+    const roles = Object.entries(ROLES).filter(([role]) => nouveau || !ROLES_NOUVEAU_LIVRE.includes(role));
+    grille.replaceChildren(...photos.map((photo, index) => {
+      const choixRole = el("select", { class: "formulaire__choix", "aria-label": `Contenu de la photo ${index + 1}` },
+        roles.map(([role, libelle]) => el("option", { value: role }, libelle)));
+      choixRole.value = photo.role;
+      choixRole.addEventListener("change", () => {
+        // Une seule photo du plat : la précédente redevient une page de la recette.
+        if (choixRole.value === "plat") for (const autre of photos) if (autre.role === "plat") autre.role = "recette";
+        photo.role = choixRole.value;
+        dessinerPhotos();
+      });
+      return el("figure", { class: "photo-envoi" },
+        el("img", { src: photo.url, alt: `Photo ${index + 1}` }),
+        el("figcaption", {}, choixRole,
+          el("button", {
+            type: "button", class: "bouton bouton--secondaire bouton--petit",
+            "aria-label": `Retirer la photo ${index + 1}`, onclick: () => retirerPhoto(index),
+          }, "✕")));
+    }));
+    boutonEnvoyer.disabled = photos.length === 0;
+  }
+  choixLivre.addEventListener("change", dessinerPhotos);
+
+  boutonEnvoyer.addEventListener("click", async () => {
+    const livre = livreChoisi();
+    const roles = photos.map((photo) => photo.role);
+    const probleme = verifierEnvoi({ roles, livre });
+    if (probleme) {
+      afficherMessage(probleme, "erreur");
+      return;
+    }
+    const date = new Date();
+    const demande = creerDemande({ date, livre, page: Number.parseInt(champPage.value, 10), roles });
+    const id = identifiantEnvoi(date);
+    boutonEnvoyer.disabled = true;
+    afficherMessage("Envoi en cours…", "info");
+    try {
+      await synchro.deposerPhotos(id, demande,
+        photos.map((photo, index) => ({ fichier: demande.photos[index].fichier, image: photo.image })));
+    } catch (erreur) {
+      afficherMessage(`Les photos n'ont pas pu être enregistrées : ${erreur.message}`, "erreur");
+      boutonEnvoyer.disabled = false;
+      return;
+    }
+    retenirDernierLivre(choixLivre.value);
+    for (const photo of photos) URL.revokeObjectURL(photo.url);
+    photos.length = 0;
+    champPage.value = "";
+    dessinerPhotos();
+    const encoreLa = (await synchro.lireEnvois()).some((envoi) => envoi.id === id && envoi.statut === "envoi");
+    const erreur = (await synchro.lireEtat()).derniereErreur;
+    if (!encoreLa) afficherMessage("Photos envoyées. Claude créera la fiche lors du prochain traitement.", "succes");
+    else if (!erreur || erreur.estHorsLigne) {
+      afficherMessage("Photos gardées sur le téléphone : elles partiront dès le retour du réseau.", "info");
+    } else {
+      afficherMessage(`Photos gardées sur le téléphone, mais l'envoi a échoué : ${erreur.message} `
+        + "Nouvel essai à chaque synchronisation.", "erreur");
+    }
+    await rafraichir();
+  });
+
+  // Envois pas encore transformés en fiches : encore sur le téléphone, ou déposés sur GitHub.
+  const listeEnvois = el("div");
+  async function rafraichir() {
+    const envois = await synchro.lireEnvois();
+    listeEnvois.replaceChildren(envois.length
+      ? el("ul", { class: "envois" }, envois.map((envoi) => el("li", {},
+        el("span", {}, envoi.statut === "envoi" ? "⏳ En attente d'envoi" : "📬 Envoyé, à traiter par Claude"),
+        el("span", { class: "discret" },
+          [envoi.demande?.date && formaterDate(Date.parse(envoi.demande.date)), decrireDemande(envoi.demande)]
+            .filter(Boolean).join(" · ")))))
+      : el("p", { class: "discret" }, "Aucune photo en attente de traitement."));
+  }
+  await rafraichir();
+  dessinerPhotos();
+
+  return {
+    contenu: el("div", {}, entete,
+      el("section", { class: "carte formulaire" },
+        el("p", {}, el("strong", {}, "1. Le livre")),
+        el("label", { class: "champ", for: "livre-envoi" }, el("span", {}, "Recette tirée de"), choixLivre),
+        aideNouveauLivre,
+        zonePage),
+      el("section", { class: "carte formulaire" },
+        el("p", {}, el("strong", {}, "2. Les photos")),
+        el("p", { class: "discret" },
+          "Livre bien à plat, à la lumière du jour, photo prise d'aplomb et sans flash. "
+          + "Une photo par page ; indiquez sous chacune ce qu'elle montre."),
+        el("div", { class: "barre-actions" },
+          el("button", { type: "button", class: "bouton bouton--secondaire", onclick: () => entreeAppareil.click() }, "📷 Prendre une photo"),
+          el("button", { type: "button", class: "bouton bouton--secondaire", onclick: () => entreeGalerie.click() }, "🖼️ Galerie")),
+        entreeAppareil, entreeGalerie, grille,
+        el("div", { class: "barre-actions" }, boutonEnvoyer),
+        message),
+      el("section", { class: "carte" },
+        el("p", {}, el("strong", {}, "Envois en attente")),
+        listeEnvois)),
+    rafraichir,
+    quitter() {
+      for (const photo of photos) URL.revokeObjectURL(photo.url);
+    },
+  };
+}
+
 const vues = {
   "/": vueRecettes,
   "/favoris": vueStatut("favorite", "Mes meilleures recettes", () =>
@@ -1197,6 +1434,7 @@ const vues = {
       "Les recettes jamais cuisinées apparaissent ici, comme une liste de choses à faire.")),
   "/courses": vueCourses,
   "/reglages": vueReglages,
+  "/photo": vuePhoto,
 };
 
 // ---- Navigation ----
@@ -1306,7 +1544,7 @@ async function afficher() {
   if (recetteQuittee) retrouverRecette(conteneur, recetteQuittee);
 
   // Le détail d'une recette ou d'un livre reste rattaché à l'onglet « Recettes ».
-  const onglet = estDetail(route) ? "/" : route;
+  const onglet = estDetail(route) || route === "/photo" ? "/" : route;
   for (const lien of document.querySelectorAll(".navigation a")) {
     if (lien.dataset.route === onglet) lien.setAttribute("aria-current", "page");
     else lien.removeAttribute("aria-current");
