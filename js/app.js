@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.18.0";
+const VERSION = "0.18.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -609,8 +609,7 @@ async function vueLivre(idLivre) {
           livre.sousTitre && el("p", {}, livre.sousTitre),
           livre.auteur && el("p", {}, el("strong", {}, livre.auteur)),
           publication && el("p", { class: "discret" }, publication),
-          el("p", { class: "discret" }, nombreRecettes(recettes.length)),
-          idLivre && entreeLivre && lienAjoutPhoto(idLivre, "📷 Ajouter une recette de ce livre"))),
+          el("p", { class: "discret" }, nombreRecettes(recettes.length)))),
       idLivre
         ? cartesRecettes(trierParPage(recettes), ({ source }) => (source?.page ? `p. ${source.page}` : ""))
         : cartesRecettes(classerRecettes(recettes, "nom")[0]?.entrees ?? []));
@@ -1199,14 +1198,11 @@ async function vueCourses() {
 // du dépôt, avec le livre et la page. Claude les transforme ensuite en fiches (voir README).
 
 const CLE_DERNIER_LIVRE = "cuicui.dernierLivre";
-let livreDemande = null; // livre choisi d'avance, depuis l'écran d'un livre
 
-function lienAjoutPhoto(idLivre = null, texte = "📷 Ajouter") {
+function lienAjoutPhoto() {
   return el("a", {
-    href: "#/photo", class: "bouton bouton--secondaire bouton--petit",
-    "aria-label": idLivre ? null : "Ajouter une recette en photo",
-    onclick: () => { livreDemande = idLivre; },
-  }, texte);
+    href: "#/photo", class: "bouton bouton--secondaire bouton--petit", "aria-label": "Ajouter une recette en photo",
+  }, "📷 Ajouter");
 }
 
 // Photo du téléphone → JPEG réduit, redressé selon l'orientation de la prise de vue.
@@ -1258,8 +1254,7 @@ async function vuePhoto() {
     el("option", { value: "aucun" }, "Pas un livre (site, magazine, capture…)"),
     el("option", { value: "nouveau" }, "➕ Nouveau livre"),
     livres.map((livre) => el("option", { value: `livre:${livre.id}` }, livre.titre)));
-  const valeurInitiale = livreDemande ? `livre:${livreDemande}` : lireDernierLivre();
-  livreDemande = null;
+  const valeurInitiale = lireDernierLivre();
   choixLivre.value = [...choixLivre.options].some((option) => option.value === valeurInitiale) ? valeurInitiale : "aucun";
   const aideNouveauLivre = el("p", { class: "discret" },
     "Ajoutez une photo de la page de copyright (au dos de la page de titre : ISBN, éditeur, année). "
