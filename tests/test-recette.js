@@ -3,7 +3,8 @@
 
 import {
   ajusterIngredient, classerRecettes, formaterDuree, formaterIngredient, formaterInfos, formaterModification,
-  formaterSource, grouperIngredients, ingredientsPour, lireStatut, majuscule, modifier, recetteEnTexte, trierParPage,
+  formaterSource, grouperIngredients, ingredientsPour, lireStatut, majuscule, modifier, partiesIngredient, recetteEnTexte,
+  trierParPage,
 } from "../js/recette.js";
 
 function egal(obtenu, attendu) {
@@ -122,6 +123,16 @@ const tests = {
   "Ingrédient sans quantité et précision"() {
     egal(formaterIngredient(ingredient(null, null, "gros sel")), "Gros sel");
     egal(formaterIngredient(ingredient(2, "brin", "thym", "frais")), "2 brins de thym (frais)");
+  },
+
+  "Ingrédient en deux colonnes : quantité, puis nom et précision"() {
+    const texte = (parties) => `${parties.quantite}|${parties.nom}|${parties.precision}`;
+    egal(texte(partiesIngredient(ingredient(4, null, "carotte"))), "4|carottes|null");
+    egal(texte(partiesIngredient(ingredient(5, "gousse", "ail"))), "5 gousses|ail|null");
+    egal(texte(partiesIngredient(ingredient(1.5, "kg", "paleron de bœuf"))), "1,5 kg|paleron de bœuf|null");
+    egal(texte(partiesIngredient(ingredient(1, null, "poireau", "le blanc"))), "1|poireau|le blanc");
+    egal(texte(partiesIngredient(ingredient(null, null, "sel"))), "|Sel|null");
+    egal(texte(partiesIngredient({ ...ingredient(2, null, "œuf"), approximatif: true })), "≈ 2|œufs|null");
   },
 
   "Source et informations"() {

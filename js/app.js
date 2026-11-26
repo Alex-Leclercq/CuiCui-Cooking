@@ -6,9 +6,9 @@ import { ouvrirStockage } from "./stockage.js";
 import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
 import {
-  CATEGORIES, CLASSEMENTS, STATUTS, TITRE_CARNET, classerRecettes, formaterDuree, formaterIngredient, formaterModification,
+  CATEGORIES, CLASSEMENTS, STATUTS, TITRE_CARNET, classerRecettes, formaterDuree, formaterModification,
   formaterSource, grouperIngredients, infosStatut, ingredientsPour, lireStatut, majuscule, modifier, nombrePersonnes,
-  recetteEnTexte, trierParPage, valeurActuelle,
+  partiesIngredient, recetteEnTexte, trierParPage, valeurActuelle,
 } from "./recette.js";
 import {
   agregerListe, ajouterALaListe, cocherArticle, cocherArticles, construireListe, listeAgregeeEnTexte, listeEnTexte,
@@ -20,8 +20,37 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.22.1";
+const VERSION = "0.23.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
+
+// Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
+// Posé avant le premier affichage, pour éviter un éclair de l'autre thème.
+const CLE_THEME = "cuicui.theme";
+
+function lireTheme() {
+  try {
+    return localStorage.getItem(CLE_THEME) === "sombre" ? "sombre" : "clair";
+  } catch {
+    return "clair";
+  }
+}
+
+function appliquerTheme(theme) {
+  if (theme === "sombre") document.documentElement.dataset.theme = "sombre";
+  else delete document.documentElement.dataset.theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "sombre" ? "#1d1916" : "#fbf6ee");
+}
+
+function choisirTheme(theme) {
+  try {
+    localStorage.setItem(CLE_THEME, theme);
+  } catch {
+    // Stockage indisponible : le choix vaut pour cette visite.
+  }
+  appliquerTheme(theme);
+}
+
+appliquerTheme(lireTheme());
 
 const stockage = await ouvrirStockage("cuicui", {
   // Une ancienne version, ouverte ailleurs (onglet Chrome, appli installée), bloque la base.
@@ -806,11 +835,12 @@ async function vueRecette(id) {
   const source = formaterSource(recette);
   const lienSource = lienWeb(recette.source?.url);
   const categorie = recette.categorie && (CATEGORIES[recette.categorie] ?? majuscule(String(recette.categorie)));
+  // Surtitre « Plat · Française » ; les mots-clés en petites capsules, tels qu'écrits dans la fiche.
+  const surtitre = [categorie, recette.cuisine && majuscule(String(recette.cuisine))].filter(Boolean).join(" · ");
   const etiquettes = [
-    recette.cuisine,
     recette.difficulte,
     ...(Array.isArray(recette.motsCles) ? recette.motsCles : []),
-  ].filter(Boolean).map((etiquette) => majuscule(String(etiquette)));
+  ].filter(Boolean).map(String);
 
   // Toute modification (statut, notes) passe par ici : ligne d'historique,
   // enregistrement sur le téléphone, envoi à GitHub, mise à jour de l'écran.
@@ -875,10 +905,12 @@ async function vueRecette(id) {
   const boutonMoins = el("button", { type: "button", class: "portions__bouton", "aria-label": "Une personne de moins" });
   const boutonPlus = el("button", { type: "button", class: "portions__bouton portions__bouton--plus", "aria-label": "Une personne de plus" });
   const boutonRevenir = el("button", { type: "button", class: "bouton bouton--secondaire bouton--petit", hidden: true });
+  const libellePersonnes = el("span", { class: "portions__libelle" });
 
   function afficherIngredients() {
     const ajustee = origine !== null && personnes !== origine;
-    valeurPersonnes.textContent = origine ? nombrePersonnes(personnes) : "";
+    valeurPersonnes.textContent = origine ? String(personnes) : "";
+    libellePersonnes.textContent = origine ? `Pour ${nombrePersonnes(personnes)}` : "";
     boutonMoins.disabled = personnes <= PERSONNES_MIN;
     boutonPlus.disabled = personnes >= PERSONNES_MAX;
     boutonRevenir.hidden = !ajustee;
@@ -889,7 +921,14 @@ async function vueRecette(id) {
     listeIngredients.replaceChildren(...grouperIngredients(ingredientsPour(recette, personnes)).map((groupe) =>
       el("section", {},
         groupe.nom && el("h4", {}, String(groupe.nom)),
-        el("ul", { class: "ingredients" }, groupe.ingredients.map((ingredient) => el("li", {}, formaterIngredient(ingredient)))))));
+        el("ul", { class: "ingredients" }, groupe.ingredients.map((ingredient) => {
+          // Deux colonnes : la quantité (en terre cuite), puis le nom et, dessous, la précision.
+          const parties = partiesIngredient(ingredient);
+          return el("li", { class: "ingredient" },
+            el("span", { class: "ingredient__quantite" }, parties.quantite),
+            el("span", { class: "ingredient__nom" }, parties.nom,
+              parties.precision && el("small", { class: "ingredient__precision" }, parties.precision)));
+        })))));
     afficherBoutonListe();
   }
 
@@ -926,8 +965,11 @@ async function vueRecette(id) {
   boutonRevenir.addEventListener("click", () => changerPersonnes(origine));
   afficherIngredients();
 
+  // « Pour 6 personnes » à gauche ; à droite, le réglage − 6 + dans une petite boîte.
   const reglagePortions = origine && el("div", { class: "portions", role: "group", "aria-label": "Nombre de personnes" },
-    el("span", {}, "Pour"), boutonMoins, valeurPersonnes, boutonPlus, boutonRevenir);
+    libellePersonnes,
+    el("div", { class: "portions__reglage" }, boutonMoins, valeurPersonnes, boutonPlus),
+    boutonRevenir);
 
   const boutonPartager = el("button", { type: "button", class: "bouton-icone", "aria-label": "Partager", title: "Partager" }, icone("partager"));
   boutonPartager.addEventListener("click", () => partager(recette, message, personnes));
@@ -966,7 +1008,7 @@ async function vueRecette(id) {
       // La fiche remonte sur la photo, comme une feuille posée dessus.
       el("div", { class: "recette__feuille" },
       el("div", { class: "recette__surligne" },
-        el("p", { class: "recette__surtitre" }, categorie ?? ""),
+        el("p", { class: "recette__surtitre" }, surtitre),
         choixStatut),
       el("h2", {}, String(recette.nom ?? id)),
       // Chef, puis le livre et sa page : le livre mène à toutes ses recettes.
@@ -1193,8 +1235,17 @@ async function vueReglages() {
   const stockageProtege = el("p", { class: "discret" }, "Vérification de la protection des données…");
   afficherEtatStockage(stockageProtege);
 
+  // Apparence : deux pastilles, Clair (par défaut) ou Sombre, appliquées tout de suite.
+  const themeActuel = lireTheme();
+  const choixTheme = el("div", { class: "filtres__pastilles", role: "radiogroup", "aria-label": "Thème" },
+    [["clair", "Clair"], ["sombre", "Sombre"]].map(([valeur, libelle]) => el("label", { class: "pastille" },
+      el("input", { type: "radio", name: "theme", value: valeur, checked: themeActuel === valeur, onchange: () => choisirTheme(valeur) }),
+      libelle)));
+
   return {
     contenu: page("Réglages",
+      el("section", { class: "carte" },
+        el("p", {}, el("strong", {}, "Apparence")), choixTheme),
       formulaire,
       el("section", { class: "carte" },
         el("p", {}, el("strong", {}, "Synchronisation")), etat, conflits,
@@ -1266,7 +1317,7 @@ async function vueCourses() {
           type: "checkbox", checked: article.coche,
           onchange: (evenement) => changer((liste) => cocherArticle(liste, article.cle, evenement.target.checked)),
         }),
-        el("span", {}, article.texte)))));
+        el("span", {}, ...texteArticle(partiesIngredient(article.ingredient)))))));
 
   // Une recette de la liste et ses ingrédients. Le titre plie ou déplie les ingrédients (retenu
   // sur le téléphone) ; le nombre de personnes se règle ici aussi, et la recette peut être retirée.
@@ -1365,13 +1416,19 @@ async function vueCourses() {
               onchange: (evenement) => changer((liste) => cocherArticles(liste, article.cles, evenement.target.checked)),
             }),
             el("span", { class: "courses__ligne" },
-              el("span", {}, article.texte),
+              el("span", {}, ...texteArticle(article.parties)),
               el("small", { class: "courses__origine" }, article.recettes.join(" · ")))))))
         : el("p", { class: "discret courses__vide" }, "Aucun ingrédient."));
   }
 
   await rafraichir();
   return { contenu: el("div", {}, enteteFige(ligneTitre("Courses", actions), progression, onglets), contenu), rafraichir };
+}
+
+// Un article de la liste de courses : la quantité en gras, puis le nom (« **2 tranches** lard fumé »).
+function texteArticle({ quantite, nom, precision }) {
+  return [quantite && el("strong", { class: "courses__quantite" }, quantite), quantite ? " " : "", nom,
+    precision ? ` (${precision})` : ""];
 }
 
 // Vue choisie dans Courses : retenue sur ce téléphone (simple confort, sans importance si elle se perd).
