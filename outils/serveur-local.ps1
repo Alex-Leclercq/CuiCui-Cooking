@@ -14,6 +14,7 @@ $types = @{
   ".svg" = "image/svg+xml"
   ".png" = "image/png"
   ".jpg" = "image/jpeg"
+  ".woff2" = "font/woff2"
 }
 
 $ecoute = New-Object System.Net.HttpListener
@@ -29,14 +30,21 @@ try {
     $fichier = [IO.Path]::GetFullPath((Join-Path $racine $chemin))
     $reponse = $contexte.Response
 
-    if ($fichier.StartsWith($racine) -and (Test-Path $fichier -PathType Leaf)) {
-      $octets = [IO.File]::ReadAllBytes($fichier)
-      $type = $types[[IO.Path]::GetExtension($fichier).ToLower()]
-      if ($type) { $reponse.ContentType = $type }
-      $reponse.Headers.Add("Cache-Control", "no-cache")
-      $reponse.OutputStream.Write($octets, 0, $octets.Length)
-    } else {
-      $reponse.StatusCode = 404
+    # Une requête qui échoue (HEAD, connexion coupée…) ne doit pas arrêter le serveur.
+    try {
+      if ($fichier.StartsWith($racine) -and (Test-Path $fichier -PathType Leaf)) {
+        $octets = [IO.File]::ReadAllBytes($fichier)
+        $type = $types[[IO.Path]::GetExtension($fichier).ToLower()]
+        if ($type) { $reponse.ContentType = $type }
+        $reponse.Headers.Add("Cache-Control", "no-cache")
+        # HEAD : seulement les en-têtes, sans le contenu.
+        if ($contexte.Request.HttpMethod -eq "HEAD") { $reponse.ContentLength64 = $octets.Length }
+        else { $reponse.OutputStream.Write($octets, 0, $octets.Length) }
+      } else {
+        $reponse.StatusCode = 404
+      }
+    } catch {
+      Write-Host "Erreur sur /$chemin : $($_.Exception.Message)"
     }
     $reponse.Close()
     Write-Host "$($reponse.StatusCode) /$chemin"

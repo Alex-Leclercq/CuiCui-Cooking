@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>CuiCui Cooking</title>
   <meta name="description" content="Mon carnet de recettes de poche.">
-  <meta name="theme-color" content="#c8553d">
+  <meta name="theme-color" content="#fbf6ee">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icones/icone.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icones/icone-192.png">
@@ -15,30 +15,37 @@
 </head>
 <body>
   <header class="entete">
-    <h1 class="entete__titre">🐦 CuiCui Cooking</h1>
+    <h1 class="entete__titre">
+      <svg class="entete__logo" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="#d9694e"/><circle cx="17" cy="19" r="8" fill="#fff8ee"/><circle cx="21" cy="13" r="5" fill="#fff8ee"/><circle cx="22" cy="12.5" r="1.2" fill="#2e2420"/><path d="M25.5 13 29 14l-3.5 1.2z" fill="#e8a33d"/></svg>
+      CuiCui Cooking
+    </h1>
     <span class="entete__badges">
       <a id="etat-synchro" class="entete__etat" href="#/reglages" hidden></a>
       <span id="etat-connexion" class="entete__etat" hidden>Hors ligne</span>
+      <a class="entete__reglages" href="#/reglages" aria-label="Réglages">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </a>
     </span>
   </header>
 
   <main id="vue" class="vue" tabindex="-1"></main>
 
+  <!-- Icônes au trait (plus d'emoji) : même rendu sur tous les téléphones. -->
   <nav class="navigation" aria-label="Navigation principale">
     <a href="#/" data-route="/">
-      <span class="navigation__icone" aria-hidden="true">📖</span>Recettes
+      <svg class="navigation__icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h13"/></svg>Recettes
     </a>
     <a href="#/favoris" data-route="/favoris">
-      <span class="navigation__icone" aria-hidden="true">⭐</span>Favoris
+      <svg class="navigation__icone" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3l-5.5 2.9 1-6.2L3 9.6l6.2-.9z"/></svg>Favoris
+    </a>
+    <a href="#/photo" data-route="/photo" class="navigation__ajout" aria-label="Ajouter une recette en photo">
+      <svg class="navigation__icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
     </a>
     <a href="#/a-essayer" data-route="/a-essayer">
-      <span class="navigation__icone" aria-hidden="true">📝</span>À essayer
+      <svg class="navigation__icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h10v16H5V8z"/><path d="M9 4v4H5"/><path d="m9 14 2 2 4-4"/></svg>À essayer
     </a>
     <a href="#/courses" data-route="/courses">
-      <span class="navigation__icone" aria-hidden="true">🛒</span>Courses
-    </a>
-    <a href="#/reglages" data-route="/reglages">
-      <span class="navigation__icone" aria-hidden="true">⚙️</span>Réglages
+      <svg class="navigation__icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11h10.2L20 8H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>Courses
     </a>
   </nav>
 
