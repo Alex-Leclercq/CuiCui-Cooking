@@ -148,6 +148,21 @@ const tests = {
     egal(texte(partiesIngredient({ ...ingredient(2, null, "œuf"), approximatif: true })), "≈ 2|œufs|null");
   },
 
+  "Colonne des quantités : cuillères abrégées, moitiés et quarts en fraction (sauf g, kg, ml, cl, l)"() {
+    const quantite = (...valeurs) => partiesIngredient(ingredient(...valeurs)).quantite;
+    egal(quantite(1, "c. à soupe", "vinaigre"), "1 c. à s.");
+    egal(quantite(3, "c. à soupe", "raisin sec"), "3 c. à s.");
+    egal(quantite(0.5, "c. à café", "coriandre"), "½ c. à c.");
+    egal(quantite(1.5, "botte", "persil"), "1 ½ bottes");
+    egal(quantite(0.25, null, "chou"), "¼");
+    egal(quantite(0.5, null, "vin blanc"), "½");
+    egal(quantite(1.5, "kg", "bœuf"), "1,5 kg");
+    egal(quantite(0.5, "l", "lait"), "0,5 l");
+    egal(quantite(0.2, null, "citron"), "0,2");
+    // Le texte complet (partage) garde les unités en entier.
+    egal(formaterIngredient(ingredient(0.5, "c. à café", "coriandre")), "0,5 c. à café de coriandre");
+  },
+
   "Source et informations"() {
     egal(formaterSource(exemple), "Chef Test · Livre test, p. 12");
     egal(formaterSource({ chef: null, source: { titre: "Marmiton" } }), "Marmiton");
