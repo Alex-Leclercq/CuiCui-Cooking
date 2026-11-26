@@ -1771,25 +1771,34 @@ body[data-ecran="recette"] .vue {
   background: var(--bec);
 }
 
+/* Photo du plat entière, dans ses propres proportions : la plupart sont en hauteur
+   (cadrées pour le livre), un bandeau en largeur n'en montrerait que la bande du milieu.
+   Seules les très hautes sont limitées à 3/4 de l'écran. */
 .recette .photo-plat {
-  height: calc(300px + env(safe-area-inset-top));
   margin: 0 -20px;
+  overflow: hidden;
+  border-radius: 0 0 28px 28px;
   background: var(--surface-douce);
 }
 
+/* Place réservée en attendant la photo (format le plus courant), pour que l'écran ne saute pas. */
+.recette .photo-plat:not(:has(img)) {
+  aspect-ratio: 4 / 5;
+}
+
 .recette .photo-plat img {
+  display: block;
   width: 100%;
-  height: 100%;
-  max-height: none;
+  height: auto;
+  max-height: 75vh;
   border-radius: 0;
   object-fit: cover;
 }
 
 .recette__feuille {
   position: relative;
-  margin: -28px -20px 0;
-  padding: 22px 20px 8px;
-  border-radius: 28px 28px 0 0;
+  margin: 0 -20px;
+  padding: 20px 20px 8px;
   background: var(--fond);
 }
 
@@ -2317,4 +2326,11 @@ body[data-ecran="recette"] .vue {
 
 .recette .entete-vue a.entete-vue__retour {
   color: #2e2420;
+}
+
+/* Compteur à côté du titre d'une section, qu'elle soit pliable ou non (Favoris). */
+.groupe__titre .discret {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
 }

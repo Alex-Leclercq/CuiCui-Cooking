@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.20.3";
+const VERSION = "0.21.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -694,7 +694,9 @@ async function vueLivre(idLivre) {
 }
 
 // Onglets « Favoris » et « À essayer » : les recettes d'un statut donné.
-function vueStatut(statut, titre, vide) {
+// parCategorie : recettes rangées en sections par catégorie (Petit-déjeuner, Apéritif, Entrée…),
+// dans le même ordre que Mes recettes → Catégorie ; toutes les sections sont ouvertes.
+function vueStatut(statut, titre, vide, { parCategorie = false } = {}) {
   return async () => {
     const liste = el("div");
     const selection = creerSelection(() => rafraichir());
@@ -704,7 +706,9 @@ function vueStatut(statut, titre, vide) {
       const entrees = (await stockage.lireRecettes()).filter((entree) => lireStatut(entree.recette) === statut);
       barreSelection.hidden = entrees.length === 0;
       compteur.textContent = entrees.length ? nombreRecettes(entrees.length) : "";
-      liste.replaceChildren(...(entrees.length ? listeRecettes(entrees, selection) : [vide()]));
+      if (!entrees.length) liste.replaceChildren(vide());
+      else if (parCategorie) liste.replaceChildren(...listeGroupee(classerRecettes(entrees, "categorie"), selection));
+      else liste.replaceChildren(...listeRecettes(entrees, selection));
     }
     await rafraichir();
     return {
@@ -1553,7 +1557,8 @@ const vues = {
   "/": vueRecettes,
   "/favoris": vueStatut("favorite", "Mes meilleures recettes", () =>
     pageVide("⭐", "Aucune favorite pour l'instant.",
-      "Sur l'écran d'une recette, choisissez « ⭐ Favorite » pour la retrouver ici.")),
+      "Sur l'écran d'une recette, choisissez « Favorite » dans la pastille de statut pour la retrouver ici."),
+    { parCategorie: true }),
   "/a-essayer": vueStatut("a-essayer", "À essayer", () =>
     pageVide("📝", "Aucune recette à essayer.",
       "Les recettes jamais cuisinées apparaissent ici, comme une liste de choses à faire.")),
