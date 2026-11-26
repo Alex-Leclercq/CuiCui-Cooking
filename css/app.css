@@ -2397,9 +2397,23 @@ body[data-ecran="recette"] .vue {
   text-align: center;
 }
 
-/* Liste de courses : la quantité en gras. */
+/* Liste de courses : la quantité en gras et en terre cuite, comme sur la fiche recette ;
+   grisée avec le reste de la ligne une fois l'article acheté. */
 .courses__quantite {
+  color: #a8432b;
   font-weight: 700;
+}
+
+.courses__article--coche .courses__quantite {
+  color: inherit;
+}
+
+:root[data-theme="sombre"] .courses__quantite {
+  color: #f0a088;
+}
+
+:root[data-theme="sombre"] .courses__article--coche .courses__quantite {
+  color: inherit;
 }
 
 :root[data-theme="sombre"] .ingredient__quantite {
