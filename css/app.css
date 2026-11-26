@@ -1732,7 +1732,7 @@ body[data-ecran="recette"] .navigation {
 }
 
 body[data-ecran="recette"] {
-  --hauteur-nav: 84px; /* la barre « Ajouter aux courses » remplace la barre des onglets */
+  --hauteur-nav: 16px; /* pas de barre en bas : le panier est en haut de l'écran */
 }
 
 body[data-ecran="recette"] .vue {
@@ -2056,36 +2056,6 @@ body[data-ecran="recette"] .vue {
   min-height: 38px;
   border-radius: 999px;
   font-size: 13px;
-}
-
-/* « Ajouter aux courses », fixé en bas de l'écran */
-.recette__barre-bas {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 3;
-  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--bordure);
-  background: var(--fond);
-}
-
-.bouton--large {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-  min-height: 54px;
-  margin: 0;
-  border: 0;
-  border-radius: 16px;
-  background: var(--terre);
-  color: #fff8ee;
-  font-size: 16px;
-}
-
-.bouton--courses[data-etat="dedans"] {
-  background: #dcebdd;
-  color: #2f5e3a;
 }
 
 /* ---- Liste de courses ---- */
@@ -2423,4 +2393,27 @@ body[data-ecran="recette"] .vue {
 
 :root[data-theme="sombre"] .ingredient__quantite {
   color: #f0a088;
+}
+
+/* Panier de la fiche recette, en haut à côté de l'écran allumé et du partage :
+   vert coché quand la recette est dans la liste, point terre cuite quand le nombre de personnes a changé. */
+.recette .bouton--courses[data-etat="dedans"] {
+  background: #dcebdd;
+  color: #2f5e3a;
+}
+
+.bouton--courses__point {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--terre);
+  box-shadow: 0 0 0 2px #fbf6ee;
+}
+
+:root[data-theme="sombre"] .recette .bouton--courses[data-etat="dedans"] {
+  background: #24402b;
+  color: #d3ecd8;
 }
