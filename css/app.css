@@ -1771,28 +1771,25 @@ body[data-ecran="recette"] .vue {
   background: var(--bec);
 }
 
-/* Photo du plat entière, dans ses propres proportions : la plupart sont en hauteur
-   (cadrées pour le livre), un bandeau en largeur n'en montrerait que la bande du milieu.
-   Seules les très hautes sont limitées à 3/4 de l'écran. */
+/* Photo du plat en carré, centrée, sur toute la largeur : le format d'avant la refonte
+   (largeur de l'écran, 360 px de haut au plus), pour lequel les photos ont été recadrées,
+   plat centré et marges égales. La place est réservée avant son arrivée : l'écran ne saute pas. */
 .recette .photo-plat {
+  aspect-ratio: 1 / 1;
   margin: 0 -20px;
   overflow: hidden;
   border-radius: 0 0 28px 28px;
   background: var(--surface-douce);
 }
 
-/* Place réservée en attendant la photo (format le plus courant), pour que l'écran ne saute pas. */
-.recette .photo-plat:not(:has(img)) {
-  aspect-ratio: 4 / 5;
-}
-
 .recette .photo-plat img {
   display: block;
   width: 100%;
-  height: auto;
-  max-height: 75vh;
+  height: 100%;
+  max-height: none;
   border-radius: 0;
   object-fit: cover;
+  object-position: center;
 }
 
 .recette__feuille {
@@ -2333,4 +2330,27 @@ body[data-ecran="recette"] .vue {
   font-family: "Inter", system-ui, sans-serif;
   font-size: 13px;
   font-weight: 500;
+}
+
+/* Courses : choix « Par recette » / « Tout ensemble », sous la barre de progression. */
+.onglets--courses {
+  margin: 12px 0 0;
+}
+
+.courses__pour {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.courses__ligne {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.courses__origine {
+  color: var(--texte-doux);
+  font-size: 12px;
+  text-decoration: none;
 }

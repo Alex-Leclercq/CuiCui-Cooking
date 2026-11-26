@@ -2,8 +2,8 @@
 // Ouvrir tests/test-courses.html avec le serveur local.
 
 import {
-  ajouterALaListe, cocherArticle, construireListe, listeEnTexte, listeVide, nettoyerCoches, normaliserListe,
-  plierRecette, retirerDeLaListe,
+  agregerListe, ajouterALaListe, cocherArticle, cocherArticles, construireListe, listeAgregeeEnTexte, listeEnTexte,
+  listeVide, nettoyerCoches, normaliserListe, plierRecette, retirerDeLaListe,
 } from "../js/courses.js";
 
 function egal(obtenu, attendu) {
@@ -85,6 +85,44 @@ const tests = {
     const texte = listeEnTexte(construireListe(choix, recettes));
     if (texte.includes("Gâteau") || texte.includes("Sel")) throw new Error(texte);
     if (!texte.includes("Crêpes (4 personnes)\n• 250 g de farine\n• 4 œufs")) throw new Error(texte);
+  },
+
+  "Tout ensemble : quantités additionnées (g et kg, œufs), une ligne par ingrédient, par ordre alphabétique"() {
+    const { articles } = agregerListe(construireListe(liste(["crepes", 4], ["gateau", 6], ["salade", null]), recettes));
+    egal(articles.map((article) => article.texte).join(" | "),
+      "50 g de beurre (fondu) | 1,05 kg de farine | 50 cl de lait | 1 laitue | 7 œufs | Poivre | Sel");
+    egal(articles.find((article) => article.nom === "farine").recettes.join(), "Crêpes,Gâteau");
+    egal(articles.find((article) => article.nom === "farine").cles.length, 2);
+  },
+
+  "Tout ensemble : cocher une ligne coche l'ingrédient dans chaque recette, et seule la part restante est comptée"() {
+    let choix = liste(["crepes", 4], ["gateau", 6]);
+    const farine = () => agregerListe(construireListe(choix, recettes)).articles.find((article) => article.nom === "farine");
+    // Farine des crêpes déjà cochée : il reste celle du gâteau.
+    const farineCrepes = construireListe(choix, recettes).recettes[0].articles.find((article) => article.texte === "250 g de farine");
+    choix = cocherArticle(choix, farineCrepes.cle, true);
+    egal(farine().texte, "800 g de farine");
+    egal(farine().coche, false);
+    // Toute la ligne cochée : les deux recettes l'ont cochée, la ligne passe en bas avec le total.
+    choix = cocherArticles(choix, farine().cles, true);
+    const construite = construireListe(choix, recettes);
+    egal(construite.recettes.every((recette) => recette.articles.some((article) => article.ingredient.nom === "farine" && article.coche)), true);
+    const { articles } = agregerListe(construite);
+    egal(articles.at(-1).texte, "1,05 kg de farine");
+    egal(articles.at(-1).coche, true);
+    const texte = listeAgregeeEnTexte({ articles });
+    if (texte.includes("farine") || !texte.includes("• 7 œufs")) throw new Error(texte);
+  },
+
+  "Tout ensemble : unités différentes et sans unité séparées ; précision reprise seulement si commune"() {
+    const autres = new Map([
+      ["a", { nom: "A", portions: null, ingredients: [ingredient(2, "gousse", "ail"), ingredient(1, null, "ail"), ingredient(20, "ml", "huile", "d'olive")] }],
+      ["b", { nom: "B", portions: null, ingredients: [ingredient(3, "gousse", "Ail", "hachée"), ingredient(30, "ml", "huile", "d'olive")] }],
+    ]);
+    const choix = [["a", null], ["b", null]].reduce((suite, [id, personnes]) => ajouterALaListe(suite, id, personnes), listeVide());
+    // Même précision partout : reprise ; précisions différentes : aucune.
+    egal(agregerListe(construireListe(choix, autres)).articles.map((article) => article.texte).join(" | "),
+      "1 ail | 5 gousses d'ail | 50 ml d'huile (d'olive)");
   },
 };
 const lignes = [];

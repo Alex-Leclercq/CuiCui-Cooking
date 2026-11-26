@@ -46,6 +46,9 @@ export function cocherArticle(liste, cle, coche) {
   return { ...liste, coches: coche ? [...coches, cle] : coches };
 }
 
+// Coche ou décoche d'un coup plusieurs articles (une ligne de la vue « Tout ensemble »).
+export const cocherArticles = (liste, cles, coche) => cles.reduce((suite, cle) => cocherArticle(suite, cle, coche), liste);
+
 // Liste à afficher, recette par recette, à partir des choix et des recettes du téléphone (Map id → recette).
 // - recettes : dans l'ordre d'ajout, chacune avec ses ingrédients pour son nombre de personnes,
 //   dans l'ordre de la recette, les cochés à la fin ;
@@ -70,7 +73,7 @@ export function construireListe(liste, recettesParId) {
       .map((ingredient, index) => {
         const texte = formaterIngredient(ingredient);
         const cle = `${choix.id}|${index}|${texte}`;
-        return { cle, texte, coche: coches.has(cle) };
+        return { cle, texte, coche: coches.has(cle), ingredient };
       });
     recettes.push({
       id: choix.id, nom: String(recette.nom ?? choix.id), personnes, origine, plie: choix.plie,
@@ -78,6 +81,80 @@ export function construireListe(liste, recettesParId) {
     });
   }
   return { recettes, introuvables };
+}
+
+// ---- Vue « Tout ensemble » : les ingrédients de toutes les recettes, additionnés ----
+
+const MASSES = { g: 1, kg: 1000 }; // en grammes
+const VOLUMES = { ml: 1, cl: 10, l: 1000 }; // en millilitres
+const arrondi = (valeur) => Math.round(valeur * 100) / 100;
+
+// Total d'une ligne, dans l'unité qui se lit le mieux : kg dès 1 000 g, l dès 1 000 ml,
+// ml seulement si toutes les recettes parlent en ml, sinon cl.
+function totalLisible(famille, total, unites) {
+  if (famille === "masse") return total >= 1000 ? { quantite: arrondi(total / 1000), unite: "kg" } : { quantite: arrondi(total), unite: "g" };
+  if (famille === "volume") {
+    if (total >= 1000) return { quantite: arrondi(total / 1000), unite: "l" };
+    if ([...unites].every((unite) => unite === "ml")) return { quantite: arrondi(total), unite: "ml" };
+    return { quantite: arrondi(total / 10), unite: "cl" };
+  }
+  return { quantite: arrondi(total), unite: [...unites][0] ?? null };
+}
+
+// Une ligne par ingrédient : même nom (sans tenir compte des majuscules) et unités compatibles
+// (g et kg, ml, cl et l ; sinon la même unité). Les quantités qui restent à acheter sont additionnées ;
+// sans quantité (sel, poivre), une seule ligne. Une précision n'est reprise que si tous les articles
+// de la ligne ont la même (« 0,5 vin blanc (bouteille) ») ; sinon elle ne vaudrait que pour une recette.
+// Chaque ligne garde les clés des articles qu'elle regroupe (pour les cocher d'un coup) et les recettes concernées.
+// Une ligne est cochée quand tous ses articles le sont. Lignes à acheter d'abord, par ordre alphabétique.
+export function agregerListe(construite) {
+  const lignes = new Map();
+  for (const recette of construite.recettes) {
+    for (const article of recette.articles) {
+      const { quantite, unite = null, nom = "", precision = null } = article.ingredient ?? {};
+      const chiffree = Number.isFinite(quantite) && quantite > 0;
+      const famille = !chiffree ? "sans" : unite in MASSES ? "masse" : unite in VOLUMES ? "volume" : `unite:${unite ?? ""}`;
+      const nomPropre = String(nom).trim();
+      const cle = `${nomPropre.toLocaleLowerCase("fr")}|${famille}`;
+      if (!lignes.has(cle)) {
+        lignes.set(cle, {
+          cle: `ensemble|${cle}`, nom: nomPropre, famille, total: 0, totalTout: 0, unites: new Set(), precisions: new Set(),
+          cles: [], recettes: [], cochees: 0,
+        });
+      }
+      const ligne = lignes.get(cle);
+      const base = chiffree ? quantite * (MASSES[unite] ?? VOLUMES[unite] ?? 1) : 0;
+      ligne.totalTout += base;
+      if (!article.coche) ligne.total += base;
+      else ligne.cochees++;
+      if (unite) ligne.unites.add(unite);
+      ligne.precisions.add(typeof precision === "string" && precision.trim() ? precision.trim() : null);
+      ligne.cles.push(article.cle);
+      if (!ligne.recettes.includes(recette.nom)) ligne.recettes.push(recette.nom);
+    }
+  }
+  const articles = [...lignes.values()].map((ligne) => {
+    const coche = ligne.cochees === ligne.cles.length;
+    // Tout est coché : on affiche ce qui a été acheté ; sinon, ce qui reste à acheter.
+    const quantites = ligne.famille === "sans" ? { quantite: null, unite: null }
+      : totalLisible(ligne.famille, coche ? ligne.totalTout : ligne.total, ligne.unites);
+    return {
+      cle: ligne.cle, nom: ligne.nom, cles: ligne.cles, recettes: ligne.recettes, coche,
+      texte: formaterIngredient({
+        ...quantites, nom: ligne.nom, precision: ligne.precisions.size === 1 ? [...ligne.precisions][0] : null,
+      }),
+    };
+  }).sort((a, b) => Number(a.coche) - Number(b.coche) || a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" })
+    || a.texte.localeCompare(b.texte, "fr"));
+  return { articles };
+}
+
+// Texte partagé depuis la vue « Tout ensemble » : seulement ce qui reste à acheter.
+export function listeAgregeeEnTexte(agregee) {
+  const aAcheter = agregee.articles.filter((article) => !article.coche);
+  return ["🛒 Liste de courses", "",
+    ...(aAcheter.length ? aAcheter.map((article) => `• ${article.texte}`) : ["Tout est déjà acheté."]),
+    "", "Partagé depuis CuiCui Cooking 🐦"].join("\n");
 }
 
 // Coches qui ne correspondent plus à rien (recette retirée, quantité changée) : oubliées.
