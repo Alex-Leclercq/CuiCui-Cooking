@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.23.0";
+const VERSION = "0.24.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -84,6 +84,7 @@ function el(balise, attributs = {}, ...enfants) {
 // Icônes au trait (SVG), dessinées dans l'application : aucun texte de recette n'y entre.
 const ICONES = {
   panier: ["M3 4h2l2.4 11h10.2L20 8H6.2", "M9 19.5h.01", "M17 19.5h.01"],
+  panierCoche: ["M3 4h2l2.4 11h10.2L20 8H6.2", "M9 19.5h.01", "M17 19.5h.01", "m10 11 2 2 4-4"],
   loupe: ["M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z", "m20 20-3.5-3.5"],
   filtres: ["M4 7h10M18 7h2M4 17h4M12 17h8", "M16 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z", "M10 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"],
   retour: ["M15 5l-7 7 7 7"],
@@ -932,17 +933,22 @@ async function vueRecette(id) {
     afficherBoutonListe();
   }
 
-  // Liste de courses : la recette y entre pour le nombre de personnes affiché.
-  // Déjà dans la liste pour ce nombre : le bouton y mène ; pour un autre nombre : il le met à jour.
+  // Liste de courses : une icône panier en haut de l'écran (avant l'écran allumé et le partage).
+  // La recette y entre pour le nombre de personnes affiché. Panier vide : à ajouter ; vert coché :
+  // déjà dans la liste pour ce nombre (un appui y mène) ; point terre cuite : nombre changé (un appui met à jour).
   const message = el("p", { class: "message", role: "status" });
-  const boutonListe = el("button", { type: "button", class: "bouton bouton--large bouton--courses" });
+  const boutonListe = el("button", { type: "button", class: "bouton-icone bouton--courses" });
   let dansLaListe = (await lireListeCourses()).recettes.find((choix) => choix.id === id) ?? null;
   const memeNombre = () => dansLaListe && (origine === null || (dansLaListe.personnes ?? origine) === personnes);
   function afficherBoutonListe() {
     const etat = !dansLaListe ? "ajouter" : memeNombre() ? "dedans" : "mettre-a-jour";
+    const libelle = etat === "ajouter" ? "Ajouter aux courses"
+      : etat === "dedans" ? "Dans la liste de courses : voir la liste" : "Mettre à jour la liste de courses";
     boutonListe.dataset.etat = etat;
-    boutonListe.replaceChildren(icone("panier"), etat === "ajouter" ? "Ajouter aux courses"
-      : etat === "dedans" ? "Dans la liste de courses" : "Mettre à jour la liste");
+    boutonListe.setAttribute("aria-label", libelle);
+    boutonListe.title = libelle;
+    boutonListe.replaceChildren(icone(etat === "dedans" ? "panierCoche" : "panier"),
+      etat === "mettre-a-jour" ? el("span", { class: "bouton--courses__point", "aria-hidden": "true" }) : "");
   }
   boutonListe.addEventListener("click", async () => {
     if (memeNombre()) {
@@ -954,7 +960,8 @@ async function vueRecette(id) {
     dansLaListe = liste.recettes.find((choix) => choix.id === id);
     afficherBoutonListe();
     const pour = origine ? ` pour ${nombrePersonnes(personnes)}` : "";
-    annoncerAjout(message, miseAJour ? `Liste de courses mise à jour${pour}.` : `Ajoutée à la liste de courses${pour}.`);
+    // Le bouton est en haut : la confirmation s'affiche en bas de l'écran, visible où qu'on soit dans la recette.
+    notifier(miseAJour ? `Liste de courses mise à jour${pour}.` : `Ajoutée à la liste de courses${pour}.`);
   });
   const changerPersonnes = (nombre) => {
     personnes = Math.min(Math.max(nombre, PERSONNES_MIN), PERSONNES_MAX);
@@ -998,10 +1005,11 @@ async function vueRecette(id) {
 
   return {
     contenu: el("article", { class: "recette" },
-      // Barre figée, posée sur la photo : retour à gauche ; écran allumé et partage à droite.
+      // Barre figée, posée sur la photo : retour à gauche ; panier, écran allumé et partage à droite.
       enteteFige(el("div", { class: "entete-vue__barre" },
         boutonRetour(),
         el("span", { class: "entete-vue__espace" }),
+        boutonListe,
         ecranAllume.bouton,
         boutonPartager)),
       photoPlat,
@@ -1031,9 +1039,7 @@ async function vueRecette(id) {
         el("h3", {}, el("label", { for: "notes-recette" }, "Mes notes")),
         champNotes,
         el("div", { class: "barre-actions" }, boutonNotes),
-        messageNotes)),
-      // « Ajouter aux courses » reste en bas de l'écran (la barre des onglets est masquée sur une recette).
-      el("div", { class: "recette__barre-bas" }, boutonListe)),
+        messageNotes))),
     quitter: ecranAllume.arreter,
   };
 }
