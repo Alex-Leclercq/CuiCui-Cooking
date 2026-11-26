@@ -19,11 +19,11 @@
   --nav-actif: #ffb59e;
   --police-titre: "Fraunces", Georgia, "Noto Serif", "Droid Serif", serif;
   --hauteur-nav: 96px; /* barre flottante (68 px) et son espace sous elle */
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Thème sombre : choisi dans les Réglages (attribut data-theme posé par js/app.js). */
+:root[data-theme="sombre"] {
     --fond: #1d1916;
     --surface: #2a2420;
     --surface-douce: #332b26;
@@ -37,8 +37,8 @@
     --nav-fond: #3a302a;
     --nav-texte: #b3a69c;
     --nav-actif: #ffb59e;
+    color-scheme: dark;
   }
-}
 
 * {
   box-sizing: border-box;
@@ -241,15 +241,14 @@ body {
   color: #c0392b;
 }
 
-@media (prefers-color-scheme: dark) {
-  .message--succes {
+/* Thème sombre : choisi dans les Réglages (attribut data-theme posé par js/app.js). */
+:root[data-theme="sombre"] .message--succes {
     color: #6fcf97;
   }
 
-  .message--erreur {
+:root[data-theme="sombre"] .message--erreur {
     color: #ff8a80;
   }
-}
 
 /* Liste des recettes */
 
@@ -2268,57 +2267,64 @@ body[data-ecran="recette"] .vue {
 
 /* ---- Thème sombre ---- */
 
-@media (prefers-color-scheme: dark) {
-  .lien-recette__meta,
-  .recette h2 + .discret,
-  .etiquettes li,
-  .onglets__bouton,
-  .progression__texte {
+/* Thème sombre : choisi dans les Réglages (attribut data-theme posé par js/app.js). */
+:root[data-theme="sombre"] .lien-recette__meta,
+:root[data-theme="sombre"] .recette h2 + .discret,
+:root[data-theme="sombre"] .etiquettes li,
+:root[data-theme="sombre"] .onglets__bouton,
+:root[data-theme="sombre"] .progression__texte {
     color: var(--texte-doux);
   }
 
-  .statut-texte[data-statut="a-essayer"] { color: #f0a088; }
-  .statut-texte[data-statut="cuisinee"] { color: #8cc59a; }
-  .statut-texte[data-statut="favorite"] { color: #f0c06a; }
+:root[data-theme="sombre"] .statut-texte[data-statut="a-essayer"] { color: #f0a088; }
 
-  .statut-choix[data-statut="a-essayer"] { color: #ffd9cc; }
-  .statut-choix[data-statut="cuisinee"] { color: #d3ecd8; }
-  .statut-choix[data-statut="favorite"] { color: #fbe6bd; }
-  .statut-choix[data-statut="a-essayer"] .statut-choix__liste { background: #5a2a1e; }
-  .statut-choix[data-statut="cuisinee"] .statut-choix__liste { background: #24402b; }
-  .statut-choix[data-statut="favorite"] .statut-choix__liste { background: #4d3a14; }
+:root[data-theme="sombre"] .statut-texte[data-statut="cuisinee"] { color: #8cc59a; }
 
-  .ingredients li,
-  .courses__article,
-  .courses__pied {
+:root[data-theme="sombre"] .statut-texte[data-statut="favorite"] { color: #f0c06a; }
+
+:root[data-theme="sombre"] .statut-choix[data-statut="a-essayer"] { color: #ffd9cc; }
+
+:root[data-theme="sombre"] .statut-choix[data-statut="cuisinee"] { color: #d3ecd8; }
+
+:root[data-theme="sombre"] .statut-choix[data-statut="favorite"] { color: #fbe6bd; }
+
+:root[data-theme="sombre"] .statut-choix[data-statut="a-essayer"] .statut-choix__liste { background: #5a2a1e; }
+
+:root[data-theme="sombre"] .statut-choix[data-statut="cuisinee"] .statut-choix__liste { background: #24402b; }
+
+:root[data-theme="sombre"] .statut-choix[data-statut="favorite"] .statut-choix__liste { background: #4d3a14; }
+
+:root[data-theme="sombre"] .ingredients li,
+:root[data-theme="sombre"] .courses__article,
+:root[data-theme="sombre"] .courses__pied {
     border-color: var(--bordure);
   }
 
-  .progression__barre {
+:root[data-theme="sombre"] .progression__barre {
     background: var(--surface-douce);
   }
 
-  .recette__notes {
+:root[data-theme="sombre"] .recette__notes {
     border-color: var(--bordure);
   }
 
-  .courses__article input {
+:root[data-theme="sombre"] .courses__article input {
     border-color: #6b5d55;
   }
 
-  .courses__article--coche span {
+:root[data-theme="sombre"] .courses__article--coche span {
     color: var(--texte-doux);
   }
 
-  .bouton--courses[data-etat="dedans"] {
+:root[data-theme="sombre"] .bouton--courses[data-etat="dedans"] {
     background: #24402b;
     color: #d3ecd8;
   }
-}
 
 /* Liens de la fiche : sans soulignement ; le bouton retour garde la couleur de l'encre. */
 .recette .discret a {
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .recette .entete-vue a.entete-vue__retour {
@@ -2353,4 +2359,68 @@ body[data-ecran="recette"] .vue {
   color: var(--texte-doux);
   font-size: 12px;
   text-decoration: none;
+}
+
+/* Ingrédients de la fiche : la quantité en terre cuite dans sa colonne, le nom à côté,
+   la précision en petit dessous (comme la maquette). */
+.ingredient {
+  display: flex;
+  gap: 12px;
+}
+
+.ingredient__quantite {
+  flex: 0 0 auto;
+  min-width: 76px;
+  color: #a8432b;
+  font-weight: 700;
+}
+
+.ingredient__nom {
+  display: flex;
+  flex-direction: column;
+}
+
+.ingredient__precision {
+  color: var(--texte-doux);
+  font-size: 12px;
+}
+
+/* « Pour 6 personnes » et le réglage − 6 + dans une boîte blanche. */
+.portions {
+  justify-content: space-between;
+}
+
+.portions__libelle {
+  font-weight: 600;
+}
+
+.portions__reglage {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.portions__reglage .portions__bouton {
+  order: 0;
+}
+
+.portions__reglage .portions__valeur {
+  min-width: 28px;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Liste de courses : la quantité en gras. */
+.courses__quantite {
+  font-weight: 700;
+}
+
+:root[data-theme="sombre"] .ingredient__quantite {
+  color: #f0a088;
 }

@@ -3,7 +3,7 @@
 // les ingrédients sont recalculés à partir des recettes, donc toujours à jour après une synchronisation.
 // Elle reste sur le téléphone (magasin « meta »), elle n'est pas envoyée à GitHub.
 
-import { formaterIngredient, ingredientsPour, nombrePersonnes } from "./recette.js";
+import { formaterIngredient, ingredientsPour, nombrePersonnes, partiesIngredient } from "./recette.js";
 
 // { recettes: [{ id, personnes, plie }], coches: [clé d'article] }.
 // personnes : null si la recette n'a pas de portions ; plie : ingrédients masqués à l'écran.
@@ -138,11 +138,10 @@ export function agregerListe(construite) {
     // Tout est coché : on affiche ce qui a été acheté ; sinon, ce qui reste à acheter.
     const quantites = ligne.famille === "sans" ? { quantite: null, unite: null }
       : totalLisible(ligne.famille, coche ? ligne.totalTout : ligne.total, ligne.unites);
+    const ingredient = { ...quantites, nom: ligne.nom, precision: ligne.precisions.size === 1 ? [...ligne.precisions][0] : null };
     return {
       cle: ligne.cle, nom: ligne.nom, cles: ligne.cles, recettes: ligne.recettes, coche,
-      texte: formaterIngredient({
-        ...quantites, nom: ligne.nom, precision: ligne.precisions.size === 1 ? [...ligne.precisions][0] : null,
-      }),
+      texte: formaterIngredient(ingredient), parties: partiesIngredient(ingredient),
     };
   }).sort((a, b) => Number(a.coche) - Number(b.coche) || a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" })
     || a.texte.localeCompare(b.texte, "fr"));

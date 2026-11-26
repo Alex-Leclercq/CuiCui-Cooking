@@ -222,6 +222,23 @@ function texteIngredient({ quantite, unite, nom, precision }) {
   return precision ? `${texte} (${precision})` : texte;
 }
 
+// Les deux parties d'un ingrédient pour un affichage en colonnes (fiche recette, liste de courses) :
+// { quantite: "5 gousses", nom: "ail", precision } ; « 4 carottes » → { quantite: "4", nom: "carottes" } ;
+// sans quantité → { quantite: "", nom: "Sel" }. Le texte d'une ligne entière reste formaterIngredient().
+export function partiesIngredient({ quantite, unite, nom = "", precision = null, approximatif = false }) {
+  const prefixe = approximatif ? "≈ " : "";
+  let parties;
+  if (quantite == null) {
+    parties = { quantite: "", nom: nom.charAt(0).toUpperCase() + nom.slice(1) };
+  } else if (!unite) {
+    parties = { quantite: prefixe + formaterNombre(quantite), nom: quantite > 1 ? pluralizerNom(nom) : nom };
+  } else {
+    const uniteAccordee = quantite > 1 && UNITES_VARIABLES.has(unite) ? pluriel(unite) : unite;
+    parties = { quantite: `${prefixe}${formaterNombre(quantite)} ${uniteAccordee}`, nom };
+  }
+  return { ...parties, precision: typeof precision === "string" && precision.trim() ? precision : null };
+}
+
 // ---- Ajustement des portions ----
 // Les quantités sont recalculées puis arrondies à ce qui se mesure en cuisine.
 // Les quantités citées dans les étapes (texte libre) ne sont pas modifiées.
