@@ -179,7 +179,17 @@ export function formaterDuree(minutes) {
   return reste ? `${heures} h ${String(reste).padStart(2, "0")}` : `${heures} h`;
 }
 
-const pluriel = (mot) => (/[sxz]$/.test(mot) ? mot : `${mot}s`);
+// Pluriel d'un mot : -eau et -au prennent un x (poireaux, pruneaux, jambonneaux), -eu aussi sauf
+// bleu, pneu, émeu ; les sept noms en -ou qui prennent un x (choux) ; les autres un s.
+const PLURIEL_EN_S = new Set(["landau", "sarrau", "bleu", "pneu", "émeu"]);
+const OU_EN_X = new Set(["bijou", "caillou", "chou", "genou", "hibou", "joujou", "pou"]);
+function pluriel(mot) {
+  const minuscule = mot.toLowerCase();
+  if (/[sxz]$/.test(minuscule)) return mot;
+  if (!PLURIEL_EN_S.has(minuscule) && /(au|eu)$/.test(minuscule)) return `${mot}x`;
+  if (OU_EN_X.has(minuscule)) return `${mot}x`;
+  return `${mot}s`;
+}
 
 // Met au pluriel le premier mot : « jaune d'œuf » → « jaunes d'œuf ».
 // Mots qui ne s'accordent pas : variétés et mots étrangers.
@@ -200,8 +210,9 @@ function pluralizerNom(nom) {
   return mots.join(" ");
 }
 
-// « de beurre », « d'ail », « d'œuf ».
-const de = (nom) => (/^[aeiouyhàâéèêëîïôœûù]/i.test(nom) ? `d'${nom}` : `de ${nom}`);
+// « de beurre », « d'ail », « d'œuf », « d'huile » ; mais « de haricot », « de homard » : h aspiré.
+const H_ASPIRE = /^(hach|hadd|hamp|hareng|haricot|harissa|haut|homard|houmous)/i;
+const de = (nom) => (/^[aeiouyhàâéèêëîïôœûù]/i.test(nom) && !H_ASPIRE.test(nom) ? `d'${nom}` : `de ${nom}`);
 
 // { quantite: 5, unite: "gousse", nom: "ail" } → « 5 gousses d'ail ».
 // approximatif (quantité ajustée nettement arrondie) → « ≈ 2 œufs ».
