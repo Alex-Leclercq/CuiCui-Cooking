@@ -101,49 +101,70 @@ function totalLisible(famille, total, unites) {
   return { quantite: arrondi(total), unite: [...unites][0] ?? null };
 }
 
-// Une ligne par ingrédient : même nom (sans tenir compte des majuscules) et unités compatibles
-// (g et kg, ml, cl et l ; sinon la même unité). Les quantités qui restent à acheter sont additionnées ;
-// sans quantité (sel, poivre), une seule ligne. Une précision n'est reprise que si tous les articles
-// de la ligne ont la même (« 0,5 vin blanc (bouteille) ») ; sinon elle ne vaudrait que pour une recette.
-// Chaque ligne garde les clés des articles qu'elle regroupe (pour les cocher d'un coup) et les recettes concernées.
-// Une ligne est cochée quand tous ses articles le sont. Lignes à acheter d'abord, par ordre alphabétique.
+// Clé d'un nom d'ingrédient pour le regroupement : sans majuscules ni accents, et sans la marque
+// du pluriel (s ou x final de chaque mot de plus de 3 lettres), appliquée pareil à toutes les recettes :
+// « haricots blancs » et « haricot blanc », « Vinaigre de Xérès » et « vinaigre de xérès » se retrouvent.
+export function cleNom(nom) {
+  return String(nom).normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("fr").trim()
+    .split(/\s+/).map((mot) => (mot.length > 3 ? mot.replace(/[sx]$/, "") : mot)).join(" ");
+}
+
+// Nom affiché pour un regroupement : la forme la plus au singulier parmi celles des recettes
+// (l'affichage remet le pluriel selon la quantité).
+const marquesDePluriel = (nom) => nom.split(/\s+/).filter((mot) => mot.length > 3 && /[sx]$/i.test(mot)).length;
+const nomAuSingulier = (noms) => [...noms].sort((a, b) => marquesDePluriel(a) - marquesDePluriel(b))[0];
+
+// Une ligne à afficher pour un groupe d'articles du même ingrédient (tous à acheter, ou tous achetés).
+function ligneAgregee(groupe, articles, partie) {
+  const recettes = [...new Set(articles.map((article) => article.recette))];
+  const precisions = new Set(articles.map((article) => article.precision));
+  const total = articles.reduce((somme, article) => somme + article.base, 0);
+  const unites = new Set(articles.map((article) => article.unite).filter(Boolean));
+  const quantites = groupe.famille === "sans" ? { quantite: null, unite: null } : totalLisible(groupe.famille, total, unites);
+  const nom = nomAuSingulier(new Set(articles.map((article) => article.nom)));
+  const ingredient = { ...quantites, nom, precision: precisions.size === 1 ? [...precisions][0] : null };
+  return {
+    cle: `ensemble|${groupe.cle}|${partie}`, nom, cles: articles.map((article) => article.cle), recettes,
+    coche: articles.every((article) => article.coche),
+    texte: formaterIngredient(ingredient), parties: partiesIngredient(ingredient),
+  };
+}
+
+// Vue « Tout ensemble » : un ingrédient = même nom (voir cleNom : pluriel, majuscules et accents
+// ne comptent pas) et unités compatibles (g et kg, ml, cl et l ; sinon la même unité). Les quantités
+// s'additionnent ; sans quantité (sel, poivre), une seule ligne. Une précision n'est reprise que si
+// tous les articles de la ligne ont la même (« 0,5 vin blanc (bouteille) »).
+// Ingrédient acheté en partie : deux lignes. Ce qui reste à acheter, avec ses seules recettes, à sa
+// place alphabétique ; ce qui est acheté, coché, en bas avec ses seules recettes. Dès que tout est
+// coché (ou tout décoché), elles se rejoignent en une seule ligne, avec toutes les recettes.
+// Chaque ligne garde les clés des articles qu'elle regroupe, pour les cocher ou décocher d'un coup.
 export function agregerListe(construite) {
-  const lignes = new Map();
+  const groupes = new Map();
   for (const recette of construite.recettes) {
     for (const article of recette.articles) {
       const { quantite, unite = null, nom = "", precision = null } = article.ingredient ?? {};
       const chiffree = Number.isFinite(quantite) && quantite > 0;
       const famille = !chiffree ? "sans" : unite in MASSES ? "masse" : unite in VOLUMES ? "volume" : `unite:${unite ?? ""}`;
-      const nomPropre = String(nom).trim();
-      const cle = `${nomPropre.toLocaleLowerCase("fr")}|${famille}`;
-      if (!lignes.has(cle)) {
-        lignes.set(cle, {
-          cle: `ensemble|${cle}`, nom: nomPropre, famille, total: 0, totalTout: 0, unites: new Set(), precisions: new Set(),
-          cles: [], recettes: [], cochees: 0,
-        });
-      }
-      const ligne = lignes.get(cle);
-      const base = chiffree ? quantite * (MASSES[unite] ?? VOLUMES[unite] ?? 1) : 0;
-      ligne.totalTout += base;
-      if (!article.coche) ligne.total += base;
-      else ligne.cochees++;
-      if (unite) ligne.unites.add(unite);
-      ligne.precisions.add(typeof precision === "string" && precision.trim() ? precision.trim() : null);
-      ligne.cles.push(article.cle);
-      if (!ligne.recettes.includes(recette.nom)) ligne.recettes.push(recette.nom);
+      const cle = `${cleNom(nom)}|${famille}`;
+      if (!groupes.has(cle)) groupes.set(cle, { cle, famille, articles: [] });
+      groupes.get(cle).articles.push({
+        cle: article.cle, coche: article.coche, recette: recette.nom, nom: String(nom).trim(), unite,
+        base: chiffree ? quantite * (MASSES[unite] ?? VOLUMES[unite] ?? 1) : 0,
+        precision: typeof precision === "string" && precision.trim() ? precision.trim() : null,
+      });
     }
   }
-  const articles = [...lignes.values()].map((ligne) => {
-    const coche = ligne.cochees === ligne.cles.length;
-    // Tout est coché : on affiche ce qui a été acheté ; sinon, ce qui reste à acheter.
-    const quantites = ligne.famille === "sans" ? { quantite: null, unite: null }
-      : totalLisible(ligne.famille, coche ? ligne.totalTout : ligne.total, ligne.unites);
-    const ingredient = { ...quantites, nom: ligne.nom, precision: ligne.precisions.size === 1 ? [...ligne.precisions][0] : null };
-    return {
-      cle: ligne.cle, nom: ligne.nom, cles: ligne.cles, recettes: ligne.recettes, coche,
-      texte: formaterIngredient(ingredient), parties: partiesIngredient(ingredient),
-    };
-  }).sort((a, b) => Number(a.coche) - Number(b.coche) || a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" })
+  const articles = [];
+  for (const groupe of groupes.values()) {
+    const aAcheter = groupe.articles.filter((article) => !article.coche);
+    const achetes = groupe.articles.filter((article) => article.coche);
+    if (aAcheter.length && achetes.length) {
+      articles.push(ligneAgregee(groupe, aAcheter, "a-acheter"), ligneAgregee(groupe, achetes, "achete"));
+    } else {
+      articles.push(ligneAgregee(groupe, groupe.articles, "tout"));
+    }
+  }
+  articles.sort((a, b) => Number(a.coche) - Number(b.coche) || a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" })
     || a.texte.localeCompare(b.texte, "fr"));
   return { articles };
 }

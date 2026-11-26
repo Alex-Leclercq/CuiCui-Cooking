@@ -2,7 +2,7 @@
 // Ouvrir tests/test-courses.html avec le serveur local.
 
 import {
-  agregerListe, ajouterALaListe, cocherArticle, cocherArticles, construireListe, listeAgregeeEnTexte, listeEnTexte,
+  agregerListe, ajouterALaListe, cleNom, cocherArticle, cocherArticles, construireListe, listeAgregeeEnTexte, listeEnTexte,
   listeVide, nettoyerCoches, normaliserListe, plierRecette, retirerDeLaListe,
 } from "../js/courses.js";
 
@@ -97,12 +97,12 @@ const tests = {
 
   "Tout ensemble : cocher une ligne coche l'ingrédient dans chaque recette, et seule la part restante est comptée"() {
     let choix = liste(["crepes", 4], ["gateau", 6]);
-    const farine = () => agregerListe(construireListe(choix, recettes)).articles.find((article) => article.nom === "farine");
+    const farine = () => agregerListe(construireListe(choix, recettes)).articles.find((article) => article.nom === "farine" && !article.coche);
     // Farine des crêpes déjà cochée : il reste celle du gâteau.
     const farineCrepes = construireListe(choix, recettes).recettes[0].articles.find((article) => article.texte === "250 g de farine");
     choix = cocherArticle(choix, farineCrepes.cle, true);
     egal(farine().texte, "800 g de farine");
-    egal(farine().coche, false);
+    egal(farine().recettes.join(), "Gâteau");
     // Toute la ligne cochée : les deux recettes l'ont cochée, la ligne passe en bas avec le total.
     choix = cocherArticles(choix, farine().cles, true);
     const construite = construireListe(choix, recettes);
@@ -112,6 +112,46 @@ const tests = {
     egal(articles.at(-1).coche, true);
     const texte = listeAgregeeEnTexte({ articles });
     if (texte.includes("farine") || !texte.includes("• 7 œufs")) throw new Error(texte);
+  },
+
+  "Tout ensemble : acheté en partie → deux lignes, chacune avec ses recettes ; réunies quand tout est coché ou décoché"() {
+    const poireaux = new Map([
+      ["fondue", { nom: "Fondue de poireaux", portions: null, ingredients: [ingredient(12, null, "poireau")] }],
+      ["potee", { nom: "Potée aux jambonneaux", portions: null, ingredients: [ingredient(6, null, "poireau")] }],
+    ]);
+    let choix = [["fondue", null], ["potee", null]].reduce((suite, [id, personnes]) => ajouterALaListe(suite, id, personnes), listeVide());
+    const lignes = () => agregerListe(construireListe(choix, poireaux)).articles
+      .map((article) => `${article.coche ? "[x]" : "[ ]"} ${article.texte} ← ${article.recettes.join(" · ")}`).join(" | ");
+    egal(lignes(), "[ ] 18 poireaux ← Fondue de poireaux · Potée aux jambonneaux");
+    // Dans « Par recette », les 6 poireaux de la potée sont cochés.
+    const potee = construireListe(choix, poireaux).recettes[1].articles[0];
+    choix = cocherArticle(choix, potee.cle, true);
+    egal(lignes(), "[ ] 12 poireaux ← Fondue de poireaux | [x] 6 poireaux ← Potée aux jambonneaux");
+    // Cocher les 12 dans « Tout ensemble » : tout est acheté, une seule ligne avec les deux recettes.
+    const aAcheter = agregerListe(construireListe(choix, poireaux)).articles[0];
+    choix = cocherArticles(choix, aAcheter.cles, true);
+    egal(lignes(), "[x] 18 poireaux ← Fondue de poireaux · Potée aux jambonneaux");
+    // Tout décocher : une seule ligne à acheter.
+    choix = cocherArticles(choix, agregerListe(construireListe(choix, poireaux)).articles[0].cles, false);
+    egal(lignes(), "[ ] 18 poireaux ← Fondue de poireaux · Potée aux jambonneaux");
+    // Décocher seulement la ligne achetée (les 6) : elle rejoint les 12 à acheter.
+    choix = cocherArticle(choix, potee.cle, true);
+    const achetee = agregerListe(construireListe(choix, poireaux)).articles.find((article) => article.coche);
+    choix = cocherArticles(choix, achetee.cles, false);
+    egal(lignes(), "[ ] 18 poireaux ← Fondue de poireaux · Potée aux jambonneaux");
+  },
+
+  "Tout ensemble : singulier et pluriel, majuscules et accents d'un même ingrédient se regroupent"() {
+    const variantes = new Map([
+      ["a", { nom: "A", portions: null, ingredients: [ingredient(1, null, "poireau"), ingredient(100, "g", "haricot blanc"), ingredient(1, "c. à soupe", "Vinaigre de Xérès")] }],
+      ["b", { nom: "B", portions: null, ingredients: [ingredient(12, null, "poireaux"), ingredient(200, "g", "haricots blancs"), ingredient(2, "c. à soupe", "vinaigre de xeres")] }],
+    ]);
+    const choix = [["a", null], ["b", null]].reduce((suite, [id, personnes]) => ajouterALaListe(suite, id, personnes), listeVide());
+    egal(agregerListe(construireListe(choix, variantes)).articles.map((article) => article.texte).join(" | "),
+      "300 g de haricot blanc | 13 poireaux | 3 c. à soupe de Vinaigre de Xérès");
+    // Pas de faux regroupement : « poivre » et « poivre mignonnette » restent distincts.
+    egal(cleNom("poivre") === cleNom("poivre mignonnette"), false);
+    egal(cleNom("Haricots Blancs"), cleNom("haricot blanc"));
   },
 
   "Tout ensemble : unités différentes et sans unité séparées ; précision reprise seulement si commune"() {

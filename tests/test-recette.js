@@ -120,6 +120,19 @@ const tests = {
     egal(formaterIngredient(ingredient(2, "c. à soupe", "huile")), "2 c. à soupe d'huile");
   },
 
+  "Pluriels en x et h aspiré"() {
+    egal(formaterIngredient(ingredient(6, null, "poireau")), "6 poireaux");
+    egal(formaterIngredient(ingredient(4, null, "pruneau")), "4 pruneaux");
+    egal(formaterIngredient(ingredient(2, null, "chou vert")), "2 choux verts");
+    egal(formaterIngredient(ingredient(3, null, "clou de girofle")), "3 clous de girofle");
+    egal(formaterIngredient(ingredient(2, null, "bleu")), "2 bleus");
+    egal(formaterIngredient(ingredient(200, "g", "haricot vert")), "200 g de haricot vert");
+    egal(formaterIngredient(ingredient(1, "boîte", "hareng")), "1 boîte de hareng");
+    egal(formaterIngredient(ingredient(1, "c. à café", "harissa")), "1 c. à café de harissa");
+    egal(formaterIngredient(ingredient(2, "c. à soupe", "huile d'olive")), "2 c. à soupe d'huile d'olive");
+    egal(formaterIngredient(ingredient(2, "c. à soupe", "herbes de Provence")), "2 c. à soupe d'herbes de Provence");
+  },
+
   "Ingrédient sans quantité et précision"() {
     egal(formaterIngredient(ingredient(null, null, "gros sel")), "Gros sel");
     egal(formaterIngredient(ingredient(2, "brin", "thym", "frais")), "2 brins de thym (frais)");
