@@ -11,8 +11,8 @@ import {
   recetteEnTexte, trierParPage, valeurActuelle,
 } from "./recette.js";
 import {
-  ajouterALaListe, cocherArticle, construireListe, listeEnTexte, listeVide, nettoyerCoches, normaliserListe,
-  plierRecette, portionsOrigine, retirerDeLaListe,
+  agregerListe, ajouterALaListe, cocherArticle, cocherArticles, construireListe, listeAgregeeEnTexte, listeEnTexte,
+  listeVide, nettoyerCoches, normaliserListe, plierRecette, portionsOrigine, retirerDeLaListe,
 } from "./courses.js";
 import { choixDeFiltres, filtrerRecettes, filtresVides, nombreFiltres, rechercheActive } from "./recherche.js";
 import {
@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.20.3";
+const VERSION = "0.22.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 const stockage = await ouvrirStockage("cuicui", {
@@ -694,7 +694,9 @@ async function vueLivre(idLivre) {
 }
 
 // Onglets « Favoris » et « À essayer » : les recettes d'un statut donné.
-function vueStatut(statut, titre, vide) {
+// parCategorie : recettes rangées en sections par catégorie (Petit-déjeuner, Apéritif, Entrée…),
+// dans le même ordre que Mes recettes → Catégorie ; toutes les sections sont ouvertes.
+function vueStatut(statut, titre, vide, { parCategorie = false } = {}) {
   return async () => {
     const liste = el("div");
     const selection = creerSelection(() => rafraichir());
@@ -704,7 +706,9 @@ function vueStatut(statut, titre, vide) {
       const entrees = (await stockage.lireRecettes()).filter((entree) => lireStatut(entree.recette) === statut);
       barreSelection.hidden = entrees.length === 0;
       compteur.textContent = entrees.length ? nombreRecettes(entrees.length) : "";
-      liste.replaceChildren(...(entrees.length ? listeRecettes(entrees, selection) : [vide()]));
+      if (!entrees.length) liste.replaceChildren(vide());
+      else if (parCategorie) liste.replaceChildren(...listeGroupee(classerRecettes(entrees, "categorie"), selection));
+      else liste.replaceChildren(...listeRecettes(entrees, selection));
     }
     await rafraichir();
     return {
@@ -1234,6 +1238,22 @@ async function vueCourses() {
   const actions = el("span", { class: "entete-vue__actions" }, boutonPartager, boutonVider);
   const progression = el("div", { class: "progression" });
   let recettesConnues = new Map();
+
+  // Deux vues : « Par recette » (chaque recette et ses ingrédients) ou « Tout ensemble »
+  // (les ingrédients de toutes les recettes, additionnés). Le choix est retenu sur le téléphone.
+  let ensemble = lireVueCourses() === "ensemble";
+  const ongletRecettes = el("button", { type: "button", class: "onglets__bouton" }, "Par recette");
+  const ongletEnsemble = el("button", { type: "button", class: "onglets__bouton" }, "Tout ensemble");
+  const onglets = el("div", { class: "onglets onglets--courses", role: "group", "aria-label": "Présentation de la liste" },
+    ongletRecettes, ongletEnsemble);
+  function choisirVue(valeur) {
+    ensemble = valeur;
+    retenirVueCourses(valeur ? "ensemble" : "recettes");
+    rafraichir();
+  }
+  ongletRecettes.addEventListener("click", () => choisirVue(false));
+  ongletEnsemble.addEventListener("click", () => choisirVue(true));
+
   boutonVider.addEventListener("click", () => {
     if (confirm("Vider la liste de courses ? Toutes les recettes et les articles cochés seront retirés.")) changer(listeVide);
   });
@@ -1291,18 +1311,23 @@ async function vueCourses() {
     const construite = construireListe(liste, new Map(entrees.map((entree) => [entree.id, entree.recette])));
     const nettoyee = nettoyerCoches(liste, construite);
     if (nettoyee !== liste) await ecrireListeCourses(nettoyee);
-    texte = listeEnTexte(construite);
+    const agregee = agregerListe(construite);
+    texte = ensemble ? listeAgregeeEnTexte(agregee) : listeEnTexte(construite);
+    ongletRecettes.setAttribute("aria-pressed", String(!ensemble));
+    ongletEnsemble.setAttribute("aria-pressed", String(ensemble));
 
     compteur.textContent = "";
     actions.hidden = !liste.recettes.length;
     progression.hidden = !liste.recettes.length;
+    onglets.hidden = !liste.recettes.length;
     if (!liste.recettes.length) {
       contenu.replaceChildren(pageVide("🛒", "Votre liste de courses est vide.",
         "Sur une recette, touchez « Ajouter aux courses ». Pour en ajouter plusieurs d'un coup, touchez « Sélectionner » dans Mes recettes.",
         el("a", { href: "#/", class: "bouton" }, "Voir mes recettes")));
       return;
     }
-    const tous = construite.recettes.flatMap((recette) => recette.articles);
+    // La progression compte les lignes de la vue affichée.
+    const tous = ensemble ? agregee.articles : construite.recettes.flatMap((recette) => recette.articles);
     const restants = tous.filter((article) => !article.coche).length;
     // Barre de progression : ce qui reste à acheter, puis « achetés / total ».
     const part = tous.length ? Math.round(((tous.length - restants) / tous.length) * 100) : 0;
@@ -1316,7 +1341,7 @@ async function vueCourses() {
         jauge));
     contenu.replaceChildren(
       message,
-      el("ul", { class: "courses__recettes" }, construite.recettes.map(carteRecette)),
+      ensemble ? carteEnsemble(construite, agregee) : el("ul", { class: "courses__recettes" }, construite.recettes.map(carteRecette)),
       ...(construite.introuvables.length === 0 ? [] : [el("div", { class: "carte" },
         el("p", {}, `${construite.introuvables.length} recette(s) de la liste ne sont plus dans le dépôt.`),
         el("button", {
@@ -1325,8 +1350,47 @@ async function vueCourses() {
         }, "Les retirer"))]));
   }
 
+  // Vue « Tout ensemble » : une seule carte, un ingrédient par ligne avec les recettes qui en ont besoin.
+  // Cocher une ligne coche cet ingrédient dans chacune de ses recettes (la vue « Par recette » suit).
+  function carteEnsemble(construite, agregee) {
+    const pour = construite.recettes
+      .map((recette) => (recette.personnes ? `${recette.nom} (${recette.personnes} pers.)` : recette.nom)).join(", ");
+    return el("section", { class: "courses__recette courses__ensemble" },
+      el("p", { class: "discret courses__pour" }, `Pour : ${pour}`),
+      agregee.articles.length
+        ? el("ul", { class: "courses" }, agregee.articles.map((article) => el("li", {},
+          el("label", { class: `courses__article${article.coche ? " courses__article--coche" : ""}` },
+            el("input", {
+              type: "checkbox", checked: article.coche,
+              onchange: (evenement) => changer((liste) => cocherArticles(liste, article.cles, evenement.target.checked)),
+            }),
+            el("span", { class: "courses__ligne" },
+              el("span", {}, article.texte),
+              el("small", { class: "courses__origine" }, article.recettes.join(" · ")))))))
+        : el("p", { class: "discret courses__vide" }, "Aucun ingrédient."));
+  }
+
   await rafraichir();
-  return { contenu: el("div", {}, enteteFige(ligneTitre("Courses", actions), progression), contenu), rafraichir };
+  return { contenu: el("div", {}, enteteFige(ligneTitre("Courses", actions), progression, onglets), contenu), rafraichir };
+}
+
+// Vue choisie dans Courses : retenue sur ce téléphone (simple confort, sans importance si elle se perd).
+const CLE_VUE_COURSES = "cuicui.vueCourses";
+
+function lireVueCourses() {
+  try {
+    return localStorage.getItem(CLE_VUE_COURSES) === "ensemble" ? "ensemble" : "recettes";
+  } catch {
+    return "recettes";
+  }
+}
+
+function retenirVueCourses(valeur) {
+  try {
+    localStorage.setItem(CLE_VUE_COURSES, valeur);
+  } catch {
+    // Stockage indisponible : le choix vaut pour cette visite.
+  }
 }
 
 // ---- Ajout d'une recette en photo ----
@@ -1553,7 +1617,8 @@ const vues = {
   "/": vueRecettes,
   "/favoris": vueStatut("favorite", "Mes meilleures recettes", () =>
     pageVide("⭐", "Aucune favorite pour l'instant.",
-      "Sur l'écran d'une recette, choisissez « ⭐ Favorite » pour la retrouver ici.")),
+      "Sur l'écran d'une recette, choisissez « Favorite » dans la pastille de statut pour la retrouver ici."),
+    { parCategorie: true }),
   "/a-essayer": vueStatut("a-essayer", "À essayer", () =>
     pageVide("📝", "Aucune recette à essayer.",
       "Les recettes jamais cuisinées apparaissent ici, comme une liste de choses à faire.")),
