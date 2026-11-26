@@ -233,19 +233,34 @@ function texteIngredient({ quantite, unite, nom, precision }) {
   return precision ? `${texte} (${precision})` : texte;
 }
 
+// Colonne des quantités : cuillères abrégées, pour une colonne étroite.
+const UNITES_COURTES = { "c. à soupe": "c. à s.", "c. à café": "c. à c." };
+const UNITES_METRIQUES = new Set(["g", "kg", "ml", "cl", "l"]);
+const FRACTIONS = { 0.25: "¼", 0.5: "½", 0.75: "¾" };
+
+// Nombre de la colonne des quantités : ½, ¼, ¾ (« ½ c. à c. », « 1 ½ botte ») sauf avec g, kg, ml, cl
+// et l, qui restent en décimales (« 1,5 kg »).
+function nombreCourt(quantite, unite) {
+  const entier = Math.floor(quantite);
+  const fraction = FRACTIONS[Math.round((quantite - entier) * 100) / 100];
+  if (!fraction || UNITES_METRIQUES.has(unite)) return formaterNombre(quantite);
+  return entier ? `${entier} ${fraction}` : fraction;
+}
+
 // Les deux parties d'un ingrédient pour un affichage en colonnes (fiche recette, liste de courses) :
 // { quantite: "5 gousses", nom: "ail", precision } ; « 4 carottes » → { quantite: "4", nom: "carottes" } ;
-// sans quantité → { quantite: "", nom: "Sel" }. Le texte d'une ligne entière reste formaterIngredient().
+// « ½ c. à c. » (cuillères abrégées, moitiés en fraction) ; sans quantité → { quantite: "", nom: "Sel" }.
+// Le texte d'une ligne entière (partage) reste formaterIngredient(), sans abréviation.
 export function partiesIngredient({ quantite, unite, nom = "", precision = null, approximatif = false }) {
   const prefixe = approximatif ? "≈ " : "";
   let parties;
   if (quantite == null) {
     parties = { quantite: "", nom: nom.charAt(0).toUpperCase() + nom.slice(1) };
   } else if (!unite) {
-    parties = { quantite: prefixe + formaterNombre(quantite), nom: quantite > 1 ? pluralizerNom(nom) : nom };
+    parties = { quantite: prefixe + nombreCourt(quantite, unite), nom: quantite > 1 ? pluralizerNom(nom) : nom };
   } else {
-    const uniteAccordee = quantite > 1 && UNITES_VARIABLES.has(unite) ? pluriel(unite) : unite;
-    parties = { quantite: `${prefixe}${formaterNombre(quantite)} ${uniteAccordee}`, nom };
+    const uniteAccordee = UNITES_COURTES[unite] ?? (quantite > 1 && UNITES_VARIABLES.has(unite) ? pluriel(unite) : unite);
+    parties = { quantite: `${prefixe}${nombreCourt(quantite, unite)} ${uniteAccordee}`, nom };
   }
   return { ...parties, precision: typeof precision === "string" && precision.trim() ? precision : null };
 }

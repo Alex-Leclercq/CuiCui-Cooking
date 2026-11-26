@@ -2332,17 +2332,28 @@ body[data-ecran="recette"] .vue {
 }
 
 /* Ingrédients de la fiche : la quantité en terre cuite dans sa colonne, le nom à côté,
-   la précision en petit dessous (comme la maquette). */
+   la précision en petit dessous (comme la maquette).
+   La colonne des quantités prend la largeur de la plus longue quantité de la liste (grille partagée
+   par toutes les lignes, « subgrid ») : tous les noms s'alignent, et un nom long passe à la ligne
+   dans sa propre colonne, sans jamais revenir sous les chiffres. */
+.ingredients {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 14px;
+}
+
 .ingredient {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: max-content minmax(0, 1fr); /* navigateurs sans « subgrid » */
+  grid-template-columns: subgrid;
+  align-items: start;
 }
 
 .ingredient__quantite {
-  flex: 0 0 auto;
-  min-width: 76px;
   color: #a8432b;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .ingredient__nom {
