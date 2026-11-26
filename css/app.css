@@ -1,15 +1,24 @@
 /* CuiCui Cooking – styles de l'application (mobile d'abord) */
 
+/* Direction « Carnet » : papier crème, encre brune, terre cuite de la couverture du carnet. */
 :root {
-  --fond: #fbf7f2;
+  --fond: #fbf6ee;
   --surface: #ffffff;
-  --texte: #2b2420;
-  --texte-doux: #6f625a;
-  --accent: #c8553d;
+  --surface-douce: #f3eadc;
+  --texte: #2e2420;
+  --texte-doux: #6b5d55;
+  --accent: #b84a30;
   --accent-texte: #ffffff;
-  --bordure: #e8ded4;
-  --ombre: 0 1px 3px rgb(0 0 0 / 0.08);
-  --hauteur-nav: 64px;
+  --terre: #d9694e;
+  --bec: #e8a33d;
+  --sauge: #4e8a5b;
+  --bordure: #e6dacb;
+  --ombre: 0 1px 2px rgb(46 36 32 / 0.06);
+  --nav-fond: #2e2420;
+  --nav-texte: #cdbfb3;
+  --nav-actif: #ffb59e;
+  --police-titre: "Fraunces", Georgia, "Noto Serif", "Droid Serif", serif;
+  --hauteur-nav: 96px; /* barre flottante (68 px) et son espace sous elle */
   color-scheme: light dark;
 }
 
@@ -17,12 +26,17 @@
   :root {
     --fond: #1d1916;
     --surface: #2a2420;
+    --surface-douce: #332b26;
     --texte: #f2ebe4;
     --texte-doux: #b3a69c;
-    --accent: #e07a5f;
+    --accent: #e58a70;
     --accent-texte: #1d1916;
+    --terre: #e58a70;
     --bordure: #3d352f;
     --ombre: none;
+    --nav-fond: #3a302a;
+    --nav-texte: #b3a69c;
+    --nav-actif: #ffb59e;
   }
 }
 
@@ -1172,4 +1186,1135 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+/* ==== Direction « Carnet » ====
+   Couche posée sur les règles ci-dessus, d'après la maquette Claude Design :
+   papier crème, encre brune, terre cuite ; titres en Fraunces, texte en Inter ;
+   barre du bas flottante ; recette en plein écran, photo en grand. */
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../polices/fraunces.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../polices/inter.woff2") format("woff2");
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+}
+
+.vue {
+  padding: 4px 20px calc(var(--hauteur-nav) + 16px + env(safe-area-inset-bottom));
+}
+
+.vue h2,
+.groupe__titre,
+.recette h3,
+.courses__plier strong {
+  font-family: var(--police-titre);
+}
+
+/* ---- Icônes au trait ---- */
+
+.icone {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- En-tête de l'application : logo, état, Réglages ---- */
+
+.entete {
+  padding: calc(14px + env(safe-area-inset-top)) 20px 4px;
+  background: var(--fond);
+  color: var(--texte-doux);
+}
+
+.entete__titre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--police-titre);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.entete__logo {
+  width: 34px;
+  height: 34px;
+}
+
+.entete__badges {
+  align-items: center;
+  gap: 8px;
+}
+
+.entete__etat {
+  padding: 4px 10px;
+  background: var(--surface-douce);
+  color: var(--texte);
+  font-size: 12px;
+}
+
+.entete__reglages {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-right: -8px;
+  border-radius: 12px;
+  color: var(--texte-doux);
+}
+
+.entete__reglages svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- En-têtes figés des écrans ---- */
+
+.entete-vue {
+  top: -4px;
+  margin: -4px -20px 8px;
+  padding: 8px 20px 10px;
+  border-bottom: 0;
+}
+
+.entete-vue__titre {
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+
+.vue h2 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.entete-vue__titre .discret {
+  font-size: 13px;
+}
+
+.entete-vue__actions {
+  display: flex;
+  gap: 6px;
+  align-self: center;
+}
+
+.entete-vue__retour {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-left: 0;
+  border-radius: 14px;
+  color: var(--texte);
+}
+
+.entete-vue__retour .icone {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+}
+
+.entete-vue__nom {
+  font-family: var(--police-titre);
+  font-size: 18px;
+}
+
+/* ---- Barre du bas : flottante, sombre, ajout en photo au centre ---- */
+
+.navigation {
+  right: 12px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  left: 12px;
+  height: 68px;
+  padding: 0;
+  align-items: center;
+  border: 0;
+  border-radius: 24px;
+  background: var(--nav-fond);
+  box-shadow: 0 8px 24px rgb(46 36 32 / 0.25);
+}
+
+.navigation a {
+  height: 100%;
+  gap: 3px;
+  color: var(--nav-texte);
+  font-size: 11px;
+}
+
+.navigation__icone {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: none;
+  opacity: 1;
+}
+
+.navigation a[aria-current="page"] {
+  color: var(--nav-actif);
+  font-weight: 600;
+}
+
+.navigation .navigation__ajout {
+  justify-self: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: var(--terre);
+  color: #fff8ee;
+}
+
+.navigation .navigation__ajout .navigation__icone {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+}
+
+.barre-selection {
+  right: 12px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  left: 12px;
+  height: 68px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--nav-fond);
+  box-shadow: 0 8px 24px rgb(46 36 32 / 0.25);
+}
+
+.barre-selection .bouton--secondaire {
+  border-color: transparent;
+  background: transparent;
+  color: #fbf6ee;
+}
+
+.barre-selection .bouton:not(.bouton--secondaire) {
+  border: 0;
+  background: var(--terre);
+  color: #fff8ee;
+}
+
+/* ---- Boutons ---- */
+
+.bouton {
+  min-height: 46px;
+  border-radius: 14px;
+}
+
+.bouton--secondaire {
+  border-color: var(--bordure);
+  background: var(--surface);
+  color: var(--texte);
+}
+
+.bouton--petit {
+  min-height: 36px;
+  border-radius: 999px;
+}
+
+.bouton-carre,
+.bouton-icone {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--bordure);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 1rem;
+  filter: none;
+  opacity: 1;
+  cursor: pointer;
+}
+
+.bouton-carre__nombre {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-texte);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.bouton-icone[aria-pressed="true"] {
+  border-color: var(--bec);
+  background: var(--bec);
+  color: #2e2420;
+}
+
+/* ---- Recherche et « Classer par » ---- */
+
+.recherche {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.recherche__zone > .icone {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: var(--texte-doux);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.recherche__champ {
+  min-height: 46px;
+  padding-left: 42px;
+  border-color: var(--bordure);
+  border-radius: 14px;
+  font-size: 15px;
+}
+
+.classement--puces {
+  gap: 8px;
+  margin: 0 -20px 12px;
+  padding: 0 20px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.classement--puces::-webkit-scrollbar {
+  display: none;
+}
+
+.puce {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--bordure);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--texte);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.puce[aria-pressed="true"] {
+  border-color: var(--texte);
+  background: var(--texte);
+  color: var(--fond);
+  font-weight: 600;
+}
+
+.puce--action {
+  color: var(--texte-doux);
+}
+
+.puce .icone {
+  width: 16px;
+  height: 16px;
+}
+
+/* Favoris, À essayer : « Sélectionner » seul, aligné à droite. */
+.classement:not(.classement--puces) {
+  justify-content: flex-end;
+}
+
+/* ---- Cartes de recettes : photo, nom, chef · livre, durée · personnes · statut ---- */
+
+.carte {
+  border: 0;
+  border-radius: 18px;
+  box-shadow: var(--ombre);
+}
+
+.liste-recettes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.liste-recettes .carte {
+  margin: 0;
+}
+
+.lien-recette--vignette {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+}
+
+.lien-recette__corps {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.lien-recette__titre {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.lien-recette strong {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.lien-recette__corps > .discret {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.lien-recette__panier {
+  display: inline-flex;
+  color: var(--sauge);
+}
+
+.lien-recette__panier .icone {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.2;
+}
+
+.lien-recette__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  color: #5a4d45;
+  font-size: 12px;
+}
+
+.statut-texte {
+  font-weight: 600;
+}
+
+.statut-texte[data-statut="a-essayer"] { color: #a8432b; }
+.statut-texte[data-statut="cuisinee"] { color: #3d7049; }
+.statut-texte[data-statut="favorite"] { color: #8a5a0c; }
+
+.vignette {
+  display: block;
+  flex: 0 0 auto;
+  width: 76px;
+  height: 76px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--surface-douce);
+}
+
+.vignette img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---- Sections pliables (catégorie, chef…) : titre à empattements, chevron à droite ---- */
+
+.groupe__titre {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.groupe__plier {
+  justify-content: space-between;
+  min-height: 48px;
+}
+
+.groupe__plier .chevron {
+  order: 2;
+  margin-left: auto;
+  border-color: var(--texte);
+}
+
+.groupe__plier .discret {
+  margin-left: 0;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.groupe + .groupe .groupe__titre {
+  border-top: 1px solid var(--bordure);
+}
+
+.groupe > div:not([hidden]) {
+  padding-bottom: 12px;
+}
+
+/* ---- Étagère : trois couvertures par rangée ---- */
+
+.etagere {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px 14px;
+}
+
+.etagere__livre {
+  gap: 2px;
+}
+
+.etagere__titre {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.etagere__livre .discret {
+  font-size: 12px;
+}
+
+.couverture {
+  border: 0;
+  border-radius: 4px 10px 10px 4px;
+  box-shadow: 0 4px 10px rgb(46 36 32 / 0.18);
+}
+
+/* Écran d'un livre */
+.livre {
+  gap: 18px;
+}
+
+.livre .couverture {
+  flex-basis: 112px;
+}
+
+.livre__infos h2 {
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+/* ---- Recette : plein écran, photo en grand, fiche posée dessus ---- */
+
+body[data-ecran="recette"] .entete,
+body[data-ecran="recette"] .navigation {
+  display: none;
+}
+
+body[data-ecran="recette"] {
+  --hauteur-nav: 84px; /* la barre « Ajouter aux courses » remplace la barre des onglets */
+}
+
+body[data-ecran="recette"] .vue {
+  padding-top: 0;
+}
+
+/* Les boutons du haut flottent sur la photo, puis sur la fiche pendant le défilement. */
+.recette .entete-vue {
+  top: 0;
+  margin: 0 -20px -76px;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 18px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.recette .entete-vue__barre {
+  gap: 8px;
+  margin: 0;
+}
+
+.recette .entete-vue__barre > * {
+  pointer-events: auto;
+}
+
+.recette .entete-vue__retour,
+.recette .bouton-icone {
+  border: 0;
+  background: rgb(251 246 238 / 0.92);
+  color: #2e2420;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  backdrop-filter: blur(6px);
+}
+
+.recette .bouton-icone[aria-pressed="true"] {
+  background: var(--bec);
+}
+
+.recette .photo-plat {
+  height: calc(300px + env(safe-area-inset-top));
+  margin: 0 -20px;
+  background: var(--surface-douce);
+}
+
+.recette .photo-plat img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+.recette__feuille {
+  position: relative;
+  margin: -28px -20px 0;
+  padding: 22px 20px 8px;
+  border-radius: 28px 28px 0 0;
+  background: var(--fond);
+}
+
+/* Sans photo : la fiche commence sous les boutons. */
+.photo-plat[hidden] + .recette__feuille {
+  margin-top: 0;
+  padding-top: calc(76px + env(safe-area-inset-top));
+}
+
+.recette__surligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.recette__surtitre {
+  margin: 0;
+  color: var(--texte-doux);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recette h2 {
+  margin: 0 0 6px;
+  font-size: 32px;
+}
+
+.recette h2 + .discret {
+  margin: 0 0 16px;
+  color: #5a4d45;
+  font-size: 14px;
+}
+
+.recette .discret a {
+  font-weight: 600;
+}
+
+/* Pastille de statut, colorée selon le statut. */
+.statut-choix__liste {
+  min-height: 34px;
+  padding: 4px 30px 4px 12px;
+  border: 0;
+  font-size: 13px;
+}
+
+.statut-choix[data-statut="a-essayer"] { color: #7e2f1c; }
+.statut-choix[data-statut="cuisinee"] { color: #2f5e3a; }
+.statut-choix[data-statut="favorite"] { color: #6b4708; }
+.statut-choix[data-statut="a-essayer"] .statut-choix__liste { background: #f7dcd2; color: inherit; }
+.statut-choix[data-statut="cuisinee"] .statut-choix__liste { background: #dcebdd; color: inherit; }
+.statut-choix[data-statut="favorite"] .statut-choix__liste { background: #f8e3b8; color: inherit; }
+
+.statut-choix__chevron {
+  right: 12px;
+  border-color: currentColor;
+}
+
+/* Temps en trois cases */
+.temps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.temps__case {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--surface-douce);
+}
+
+.temps__libelle {
+  color: var(--texte-doux);
+  font-size: 11px;
+}
+
+.temps__case strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.etiquettes {
+  gap: 6px;
+  margin: 0 0 16px;
+}
+
+.etiquettes li {
+  padding: 4px 10px;
+  border-color: var(--bordure);
+  background: transparent;
+  color: #5a4d45;
+  font-size: 12px;
+}
+
+/* Onglets Ingrédients / Étapes */
+.onglets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 16px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface-douce);
+}
+
+.onglets__bouton {
+  height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #5a4d45;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.onglets__bouton[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--texte);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(46 36 32 / 0.1);
+}
+
+/* Nombre de personnes : « Pour 6 personnes » à gauche, − / + à droite. */
+.portions {
+  gap: 4px;
+  margin: 0 0 14px;
+}
+
+.portions > span:first-child {
+  font-weight: 600;
+}
+
+.portions__valeur {
+  margin-right: auto;
+  font-weight: 600;
+}
+
+.portions__bouton {
+  order: 3;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--surface-douce);
+  color: var(--texte);
+}
+
+.portions__bouton--plus {
+  background: var(--texte);
+  color: var(--fond);
+}
+
+.portions .bouton--petit {
+  order: 4;
+  flex-basis: 100%;
+  margin-top: 6px;
+}
+
+.recette__partie h4 {
+  margin: 14px 0 6px;
+  font-family: var(--police-titre);
+  font-size: 15px;
+}
+
+.ingredients {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--surface);
+  list-style: none;
+}
+
+.ingredients li {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1e8dc;
+  font-size: 15px;
+}
+
+.ingredients li:last-child {
+  border-bottom: 0;
+}
+
+/* Étapes numérotées dans des pastilles */
+.etapes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: etape;
+}
+
+.etapes li {
+  position: relative;
+  min-height: 32px;
+  margin-bottom: 18px;
+  padding: 3px 0 0 46px;
+  font-size: 16px;
+  line-height: 1.6;
+  counter-increment: etape;
+}
+
+.etapes li::before {
+  content: counter(etape);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--texte);
+  color: var(--fond);
+  font-family: var(--police-titre);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Mes notes : un encadré en pointillés */
+.recette__notes {
+  margin: 20px 0 8px;
+  padding: 16px;
+  border: 1.5px dashed #d8c9b6;
+  border-radius: 18px;
+}
+
+.recette__notes h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.notes-saisie {
+  min-height: 72px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.notes-saisie:focus {
+  outline: 0;
+}
+
+.recette__notes .barre-actions {
+  justify-content: flex-end;
+  margin-bottom: 0;
+}
+
+.recette__notes .bouton {
+  min-height: 38px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+/* « Ajouter aux courses », fixé en bas de l'écran */
+.recette__barre-bas {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--bordure);
+  background: var(--fond);
+}
+
+.bouton--large {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  margin: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--terre);
+  color: #fff8ee;
+  font-size: 16px;
+}
+
+.bouton--courses[data-etat="dedans"] {
+  background: #dcebdd;
+  color: #2f5e3a;
+}
+
+/* ---- Liste de courses ---- */
+
+.progression {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progression__texte {
+  display: flex;
+  justify-content: space-between;
+  color: #5a4d45;
+  font-size: 13px;
+}
+
+.progression__barre {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #efe6d8;
+}
+
+.progression__remplie {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--sauge);
+  transition: width 0.2s;
+}
+
+.courses__recettes {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.courses__recette {
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--ombre);
+}
+
+.courses__tete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.courses__photo .vignette {
+  width: 48px;
+  height: 48px;
+}
+
+.courses__plier {
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+}
+
+.courses__plier strong {
+  flex: none;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.courses__compte {
+  font-size: 12px;
+}
+
+.portions--compact {
+  flex: 0 0 auto;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  border-radius: 12px;
+  background: var(--surface-douce);
+}
+
+.portions--compact .portions__valeur {
+  order: 3;
+  min-width: 22px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.portions--compact .portions__bouton {
+  order: 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--texte);
+}
+
+.portions--compact .portions__bouton--plus {
+  order: 4;
+}
+
+.courses {
+  margin: 0;
+}
+
+.courses__article {
+  align-items: center;
+  min-height: 46px;
+  padding: 8px 16px;
+  border-top: 1px solid #f1e8dc;
+  border-bottom: 0;
+  font-size: 15px;
+}
+
+/* Case à cocher arrondie, verte une fois cochée. */
+.courses__article input {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border: 2px solid #cdbfb3;
+  border-radius: 8px;
+  background: var(--surface);
+  appearance: none;
+  cursor: pointer;
+}
+
+.courses__article input:checked {
+  border-color: var(--sauge);
+  background: var(--sauge) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E") center / 14px no-repeat;
+}
+
+.courses__article--coche span {
+  color: #8a7c72;
+}
+
+.courses__pied {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px 6px;
+  border-top: 1px solid #f1e8dc;
+}
+
+.courses__retirer {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--texte-doux);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.courses__vide {
+  padding: 0 16px;
+}
+
+/* ---- Écrans vides, formulaires, cartes des Réglages ---- */
+
+.classement__choix,
+.formulaire__choix,
+.formulaire input {
+  border-radius: 14px;
+}
+
+.carte h3 {
+  margin-top: 0;
+  font-family: var(--police-titre);
+  font-size: 18px;
+}
+
+/* ---- Thème sombre ---- */
+
+@media (prefers-color-scheme: dark) {
+  .lien-recette__meta,
+  .recette h2 + .discret,
+  .etiquettes li,
+  .onglets__bouton,
+  .progression__texte {
+    color: var(--texte-doux);
+  }
+
+  .statut-texte[data-statut="a-essayer"] { color: #f0a088; }
+  .statut-texte[data-statut="cuisinee"] { color: #8cc59a; }
+  .statut-texte[data-statut="favorite"] { color: #f0c06a; }
+
+  .statut-choix[data-statut="a-essayer"] { color: #ffd9cc; }
+  .statut-choix[data-statut="cuisinee"] { color: #d3ecd8; }
+  .statut-choix[data-statut="favorite"] { color: #fbe6bd; }
+  .statut-choix[data-statut="a-essayer"] .statut-choix__liste { background: #5a2a1e; }
+  .statut-choix[data-statut="cuisinee"] .statut-choix__liste { background: #24402b; }
+  .statut-choix[data-statut="favorite"] .statut-choix__liste { background: #4d3a14; }
+
+  .ingredients li,
+  .courses__article,
+  .courses__pied {
+    border-color: var(--bordure);
+  }
+
+  .progression__barre {
+    background: var(--surface-douce);
+  }
+
+  .recette__notes {
+    border-color: var(--bordure);
+  }
+
+  .courses__article input {
+    border-color: #6b5d55;
+  }
+
+  .courses__article--coche span {
+    color: var(--texte-doux);
+  }
+
+  .bouton--courses[data-etat="dedans"] {
+    background: #24402b;
+    color: #d3ecd8;
+  }
+}
+
+/* Liens de la fiche : sans soulignement ; le bouton retour garde la couleur de l'encre. */
+.recette .discret a {
+  text-decoration: none;
+}
+
+.recette .entete-vue a.entete-vue__retour {
+  color: #2e2420;
 }

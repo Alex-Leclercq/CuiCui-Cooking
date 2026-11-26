@@ -2,7 +2,7 @@
 // Changer CACHE à chaque version pour que les téléphones récupèrent
 // les nouveaux fichiers.
 
-const CACHE = "cuicui-v0.18.1";
+const CACHE = "cuicui-v0.20.3";
 
 const FICHIERS_APPLICATION = [
   "./",
@@ -21,6 +21,8 @@ const FICHIERS_APPLICATION = [
   "icones/carnet-cuicui.jpg",
   "icones/icone-192.png",
   "icones/icone-512.png",
+  "polices/fraunces.woff2",
+  "polices/inter.woff2",
 ];
 
 self.addEventListener("install", (evenement) => {
