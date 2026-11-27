@@ -20,10 +20,12 @@
   - le nombre de personnes ;
   - le chef ou l'auteur ;
   - la source : le livre d'origine ou le site internet.
-- **Statut de chaque recette :** sur l'écran d'une recette, la pastille colorée à côté de la catégorie (rose : à essayer, verte : déjà cuisinée, jaune : favorite) ouvre la liste des statuts. Changer de statut demande deux gestes, ce qui évite les changements par erreur :
-  - 📝 **À essayer** : jamais cuisinée. Ces recettes forment une to-do list dans l'onglet « À essayer » ;
-  - ✅ **Déjà cuisinée** : testée, correcte ;
-  - ⭐ **Favorite** : testée et adorée. Ces recettes sont dans l'onglet « Favoris », rangées par catégorie dans le même ordre que Mes recettes (Petit-déjeuner, Apéritif, Entrée, Plat…), toutes les sections ouvertes.
+- **Statut de chaque recette :** sur l'écran d'une recette, la pastille colorée à côté de la catégorie ouvre la liste des statuts. Changer de statut demande deux gestes, ce qui évite les changements par erreur :
+  - **Pas testée** (par défaut, pastille « Statut » en contour beige) : jamais cuisinée, aucun avis ; rien n'est affiché sur les cartes des listes ;
+  - **À essayer** (rose) : ma sélection de recettes à tester bientôt, réunies dans l'onglet « À essayer » ;
+  - **Favorite** (jaune) : cuisinée et adorée ; ces recettes sont dans l'onglet « Favoris », rangées par catégorie dans le même ordre que Mes recettes (Petit-déjeuner, Apéritif, Entrée, Plat…), toutes les sections ouvertes ;
+  - **Bonne** (vert) : cuisinée, réussie, mais pas un coup de cœur ;
+  - **Pas pour moi** (gris ardoise) : cuisinée, pas aimée, à ne pas refaire.
 - **Mes notes :** sur l'écran d'une recette, j'écris mes remarques dans l'encadré « Mes notes » et je les enregistre.
 - **Écran d'une recette :** en plein écran, sans la barre des onglets. La photo du plat occupe le haut, en carré centré sur toute la largeur (le format pour lequel les photos sont recadrées, comme avant la refonte), avec les boutons retour, écran allumé et partage posés dessus. Dessous : catégorie et statut, nom, chef et livre (un lien vers toutes les recettes du livre), temps de préparation, de repos et de cuisson en cases, mots-clés, puis deux onglets **Ingrédients** / **Étapes** (étapes numérotées). En haut à droite, sur la photo : le **panier** (ajouter aux courses), l'**écran allumé** et le **partage** ; aucune barre en bas, la recette occupe tout l'écran.
 - **Photo du plat :** affichée en haut de la recette, sans attente : elle est téléchargée en arrière-plan dès la synchronisation, puis gardée sur le téléphone. Elle apparaît aussi en vignette dans les listes, chargée au fur et à mesure du défilement.
@@ -162,7 +164,7 @@ Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessu
 - [x] Partager une recette en texte (menu de partage du téléphone)
 - [x] Afficher la photo du plat
 - [ ] Ajouter et modifier une recette à la main
-- [x] Choisir le statut d'une recette (à essayer, déjà cuisinée, favorite) et afficher les onglets Favoris et À essayer
+- [x] Choisir le statut d'une recette (pas testée, à essayer, favorite, bonne, pas pour moi) et afficher les onglets Favoris et À essayer
 - [x] Historique des modifications de statut et de notes, avec retour en arrière
 - [x] Classer les recettes (nom, livre, catégorie, cuisine, chef, statut) et étagère des livres
 - [x] Rechercher les recettes (nom, ingrédient, chef, livre, mots-clés) et les filtrer par catégorie, statut et cuisine

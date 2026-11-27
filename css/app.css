@@ -2442,3 +2442,54 @@ body[data-ecran="recette"] .vue {
   background: #24402b;
   color: #d3ecd8;
 }
+
+/* ---- Cinq statuts ----
+   La pastille de la fiche est le libellé lui-même (texte + couleur) ; la liste de choix du téléphone
+   est posée par-dessus, invisible, et s'ouvre au toucher. « Pas testée » : contour beige, « Statut ». */
+.statut-choix {
+  min-height: 34px;
+  padding: 4px 30px 4px 12px;
+  box-sizing: border-box;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statut-choix__texte {
+  pointer-events: none;
+}
+
+.statut-choix .statut-choix__liste {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.statut-choix:has(.statut-choix__liste:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.statut-choix[data-statut="pas-testee"] { border-color: #d8c9b6; background: transparent; color: #6b5d55; }
+.statut-choix[data-statut="a-essayer"] { background: #f7dcd2; color: #7e2f1c; }
+.statut-choix[data-statut="favorite"] { background: #f8e3b8; color: #6b4708; }
+.statut-choix[data-statut="bonne"] { background: #dcebdd; color: #2f5e3a; }
+.statut-choix[data-statut="pas-pour-moi"] { background: #e1e5ea; color: #3e4a57; }
+
+.statut-texte[data-statut="bonne"] { color: #3d7049; }
+.statut-texte[data-statut="pas-pour-moi"] { color: #4f5d6b; }
+
+:root[data-theme="sombre"] .statut-choix[data-statut="pas-testee"] { border-color: #4a403a; color: var(--texte-doux); }
+:root[data-theme="sombre"] .statut-choix[data-statut="a-essayer"] { background: #5a2a1e; color: #ffd9cc; }
+:root[data-theme="sombre"] .statut-choix[data-statut="favorite"] { background: #4d3a14; color: #fbe6bd; }
+:root[data-theme="sombre"] .statut-choix[data-statut="bonne"] { background: #24402b; color: #d3ecd8; }
+:root[data-theme="sombre"] .statut-choix[data-statut="pas-pour-moi"] { background: #2e3640; color: #d6dde5; }
+:root[data-theme="sombre"] .statut-texte[data-statut="bonne"] { color: #8cc59a; }
+:root[data-theme="sombre"] .statut-texte[data-statut="pas-pour-moi"] { color: #aab6c3; }

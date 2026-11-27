@@ -6,7 +6,7 @@ import { ouvrirStockage } from "./stockage.js";
 import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
 import {
-  CATEGORIES, CLASSEMENTS, STATUTS, TITRE_CARNET, classerRecettes, formaterDuree, formaterModification,
+  CATEGORIES, CLASSEMENTS, ORDRE_CHOIX_STATUT, STATUT_PAR_DEFAUT, TITRE_CARNET, classerRecettes, formaterDuree, formaterModification,
   formaterSource, grouperIngredients, infosStatut, ingredientsPour, lireStatut, majuscule, modifier, nombrePersonnes,
   partiesIngredient, recetteEnTexte, trierParPage, valeurActuelle,
 } from "./recette.js";
@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.25.1";
+const VERSION = "0.26.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -192,7 +192,8 @@ function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
     const meta = el("span", { class: "lien-recette__meta" },
       minutes > 0 && el("span", {}, formaterDuree(minutes)),
       Number.isInteger(portions) && portions > 0 && el("span", {}, `${portions} pers.`),
-      el("span", { class: "statut-texte", "data-statut": valeurStatut }, statut.libelle));
+      // « Pas testée » (sans avis) : rien d'affiché, pour ne pas encombrer les centaines de cartes concernées.
+      valeurStatut !== STATUT_PAR_DEFAUT && el("span", { class: "statut-texte", "data-statut": valeurStatut }, statut.libelle));
     if (selection?.active()) {
       const dejaLa = selection.dansLaListe(entree.id);
       return el("li", {},
@@ -868,14 +869,18 @@ async function vueRecette(id) {
     photoPlat.hidden = true; // hors ligne et photo pas encore téléchargée
   });
 
-  // Choix du statut : une pastille en haut à droite qui ouvre la liste de choix du téléphone.
-  // Deux gestes volontaires pour changer de statut : pas de changement par un appui accidentel.
+  // Choix du statut : une pastille colorée qui ouvre la liste de choix du téléphone (posée, invisible,
+  // par-dessus la pastille). Deux gestes volontaires pour changer de statut : pas de changement par un
+  // appui accidentel. Sans avis (« Pas testée »), la pastille affiche simplement « Statut ».
   const listeStatuts = el("select", { class: "statut-choix__liste", "aria-label": "Statut de la recette" },
-    STATUTS.map((statut) => el("option", { value: statut.valeur }, statut.libelle))); // la couleur de la pastille remplace l'icône
-  const choixStatut = el("label", { class: "statut-choix" }, listeStatuts,
+    ORDRE_CHOIX_STATUT.map((valeur) => el("option", { value: valeur }, infosStatut(valeur).libelle)));
+  const texteStatut = el("span", { class: "statut-choix__texte", "aria-hidden": "true" });
+  const choixStatut = el("label", { class: "statut-choix" }, texteStatut, listeStatuts,
     el("span", { class: "statut-choix__chevron", "aria-hidden": "true" }));
   function afficherStatut() {
     listeStatuts.value = lireStatut(recette);
+    const statut = infosStatut(listeStatuts.value);
+    texteStatut.textContent = statut.pastille ?? statut.libelle;
     choixStatut.dataset.statut = listeStatuts.value; // couleur de la pastille
   }
   listeStatuts.addEventListener("change", () => appliquer("statut", listeStatuts.value));
@@ -1684,7 +1689,7 @@ const vues = {
     { parCategorie: true }),
   "/a-essayer": vueStatut("a-essayer", "À essayer", () =>
     pageVide("📝", "Aucune recette à essayer.",
-      "Les recettes jamais cuisinées apparaissent ici, comme une liste de choses à faire.")),
+      "Sur l'écran d'une recette, choisissez « À essayer » dans la pastille de statut : elle rejoint ici votre sélection de recettes à tester.")),
   "/courses": vueCourses,
   "/reglages": vueReglages,
   "/photo": vuePhoto,

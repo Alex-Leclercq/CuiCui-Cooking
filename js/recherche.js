@@ -74,7 +74,7 @@ export function choixDeFiltres(entrees) {
     categories: [...categories].sort(([a], [b]) => rang(a) - rang(b) || a.localeCompare(b, "fr"))
       .map(([cle, nombre]) => ({ cle, titre: CATEGORIES[cle] ?? majuscule(cle), nombre })),
     statuts: STATUTS.filter((statut) => statuts.has(statut.valeur))
-      .map((statut) => ({ cle: statut.valeur, titre: `${statut.icone} ${statut.libelle}`, nombre: statuts.get(statut.valeur) })),
+      .map((statut) => ({ cle: statut.valeur, titre: statut.libelle, nombre: statuts.get(statut.valeur) })),
     cuisines: [...cuisines].sort(([a], [b]) => a.localeCompare(b, "fr"))
       .map(([cle, nombre]) => ({ cle, titre: majuscule(cle), nombre })),
   };
