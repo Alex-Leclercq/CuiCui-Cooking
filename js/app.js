@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.28.0";
+const VERSION = "0.29.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -91,6 +91,7 @@ const ICONES = {
   partager: ["M12 3v12M7 8l5-5 5 5", "M5 13v6h14v-6"],
   corbeille: ["M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"],
   fermer: ["M6 6l12 12M18 6 6 18"],
+  coche: ["m5 12 5 5 9-10"],
   soleil: ["M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", "M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"],
 };
 
@@ -685,8 +686,71 @@ async function vueRecettes() {
   };
 }
 
-// Un livre : sa couverture, ses informations et ses recettes dans l'ordre des pages.
-// idLivre vide : les recettes qui ne viennent d'aucun livre connu.
+// Menu des statuts, sous la pastille de la fiche recette (comme la maquette) : une pastille colorée
+// par statut, une coche sur le statut actuel. Un appui choisit et ferme ; toucher à côté, Échap ou
+// le geste retour du téléphone ferment sans rien changer. S'il manque de place sous la pastille,
+// le menu s'ouvre au-dessus. Flèches haut / bas au clavier.
+function ouvrirMenuStatut(pastille, actuel, choisir) {
+  const fond = el("div", { class: "menu-statut__fond" });
+  const options = ORDRE_CHOIX_STATUT.map((valeur) => el("button", {
+    type: "button", class: "menu-statut__option", role: "menuitemradio", "aria-checked": String(valeur === actuel),
+    onclick: () => {
+      fermer();
+      if (valeur !== actuel) choisir(valeur);
+    },
+  },
+  el("span", { class: "statut-pastille", "data-statut": valeur }, infosStatut(valeur).libelle),
+  valeur === actuel && icone("coche")));
+  const menu = el("div", { class: "menu-statut", role: "menu", "aria-label": "Statut de la recette" }, options);
+
+  // Placé sous la pastille, aligné sur son bord droit ; au-dessus si l'écran est trop court en dessous.
+  function placer() {
+    const zone = pastille.getBoundingClientRect();
+    const hauteur = menu.offsetHeight;
+    const marge = 8;
+    const enDessous = zone.bottom + marge + hauteur <= window.innerHeight - marge;
+    menu.style.top = `${enDessous ? zone.bottom + marge : Math.max(marge, zone.top - marge - hauteur)}px`;
+    menu.style.right = `${Math.max(marge, window.innerWidth - zone.right)}px`;
+  }
+
+  function retirer() {
+    window.removeEventListener("popstate", surRetour);
+    window.removeEventListener("resize", placer);
+    document.removeEventListener("keydown", surTouche);
+    pastille.setAttribute("aria-expanded", "false");
+    fond.remove();
+    menu.remove();
+  }
+  function surRetour() {
+    retirer();
+    pastille.focus();
+  }
+  function fermer() {
+    retirer();
+    if (history.state?.menuStatut) history.back();
+    pastille.focus();
+  }
+  function surTouche(evenement) {
+    if (evenement.key === "Escape") fermer();
+    if (evenement.key === "ArrowDown" || evenement.key === "ArrowUp") {
+      evenement.preventDefault();
+      const rang = options.indexOf(document.activeElement);
+      const suivant = (rang + (evenement.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+      options[suivant].focus();
+    }
+  }
+  fond.addEventListener("click", fermer);
+
+  history.pushState({ ...history.state, menuStatut: true }, "");
+  window.addEventListener("popstate", surRetour);
+  window.addEventListener("resize", placer);
+  document.addEventListener("keydown", surTouche);
+  pastille.setAttribute("aria-expanded", "true");
+  document.body.append(fond, menu);
+  placer();
+  (options.find((option) => option.getAttribute("aria-checked") === "true") ?? options[0]).focus();
+}
+
 // Visionneuse plein écran (couverture d'un livre) : l'image en grand sur le fond de l'appli.
 // Zoom à deux doigts (jusqu'à ×5), double appui pour zoomer / revenir, glisser pour se déplacer
 // une fois zoomé ; molette sur ordinateur. Fermeture : ✕, touche Échap ou geste retour du téléphone
@@ -828,6 +892,8 @@ function ouvrirVisionneuse(source, description) {
   boutonFermer.focus();
 }
 
+// Un livre : sa couverture, ses informations et ses recettes dans l'ordre des pages.
+// idLivre vide : les recettes qui ne viennent d'aucun livre connu.
 async function vueLivre(idLivre) {
   const contenu = el("div");
   // En-tête figé compact : retour et titre du livre ; la couverture défile avec la liste.
@@ -1020,21 +1086,21 @@ async function vueRecette(id) {
     photoPlat.hidden = true; // hors ligne et photo pas encore téléchargée
   });
 
-  // Choix du statut : une pastille colorée qui ouvre la liste de choix du téléphone (posée, invisible,
-  // par-dessus la pastille). Deux gestes volontaires pour changer de statut : pas de changement par un
-  // appui accidentel. Sans avis (« Pas testée »), la pastille affiche simplement « Statut ».
-  const listeStatuts = el("select", { class: "statut-choix__liste", "aria-label": "Statut de la recette" },
-    ORDRE_CHOIX_STATUT.map((valeur) => el("option", { value: valeur }, infosStatut(valeur).libelle)));
-  const texteStatut = el("span", { class: "statut-choix__texte", "aria-hidden": "true" });
-  const choixStatut = el("label", { class: "statut-choix" }, texteStatut, listeStatuts,
-    el("span", { class: "statut-choix__chevron", "aria-hidden": "true" }));
+  // Choix du statut : une pastille colorée qui ouvre le menu des statuts (voir ouvrirMenuStatut).
+  // Deux gestes volontaires pour changer de statut : le premier ouvre le menu, le second choisit ;
+  // un appui accidentel ne change rien. Sans avis (« Pas testée »), la pastille affiche « Statut ».
+  const texteStatut = el("span", { class: "statut-choix__texte" });
+  const choixStatut = el("button", { type: "button", class: "statut-choix", "aria-haspopup": "menu", "aria-expanded": "false" },
+    texteStatut, el("span", { class: "statut-choix__chevron", "aria-hidden": "true" }));
   function afficherStatut() {
-    listeStatuts.value = lireStatut(recette);
-    const statut = infosStatut(listeStatuts.value);
+    const valeur = lireStatut(recette);
+    const statut = infosStatut(valeur);
     texteStatut.textContent = statut.pastille ?? statut.libelle;
-    choixStatut.dataset.statut = listeStatuts.value; // couleur de la pastille
+    choixStatut.dataset.statut = valeur; // couleur de la pastille
+    choixStatut.setAttribute("aria-label", `Statut : ${statut.libelle}. Changer le statut`);
   }
-  listeStatuts.addEventListener("change", () => appliquer("statut", listeStatuts.value));
+  choixStatut.addEventListener("click", () =>
+    ouvrirMenuStatut(choixStatut, lireStatut(recette), (valeur) => appliquer("statut", valeur)));
   afficherStatut();
 
   // Notes personnelles : enregistrées sur demande (une modification = une ligne d'historique).
