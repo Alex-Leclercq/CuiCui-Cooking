@@ -34,20 +34,20 @@ const exemple = {
 };
 
 const tests = {
-  "Statut : nouveau champ"() {
-    egal(lireStatut({ statut: "favorite" }), "favorite");
-    egal(lireStatut({ statut: "cuisinee" }), "cuisinee");
+  "Statut : les cinq valeurs, « Pas testée » par défaut"() {
+    for (const valeur of ["pas-testee", "a-essayer", "favorite", "bonne", "pas-pour-moi"]) egal(lireStatut({ statut: valeur }), valeur);
+    egal(lireStatut({}), "pas-testee");
   },
 
-  "Statut : « à ne pas refaire » (retiré) lu comme « déjà cuisinée »"() {
-    egal(lireStatut({ statut: "a-eviter" }), "cuisinee");
+  "Statut : anciennes valeurs (déjà cuisinée → Bonne, à ne pas refaire → Pas pour moi)"() {
+    egal(lireStatut({ statut: "cuisinee" }), "bonne");
+    egal(lireStatut({ statut: "a-eviter" }), "pas-pour-moi");
   },
 
   "Statut : ancien format favori / aEssayer"() {
-    egal(lireStatut({ favori: false, aEssayer: true }), "a-essayer");
-    egal(lireStatut({ favori: false, aEssayer: false }), "cuisinee");
+    egal(lireStatut({ favori: false, aEssayer: true }), "pas-testee");
+    egal(lireStatut({ favori: false, aEssayer: false }), "bonne");
     egal(lireStatut({ favori: true, aEssayer: false }), "favorite");
-    egal(lireStatut({}), "a-essayer");
     egal(lireStatut({ statut: "inconnu", favori: true }), "favorite");
   },
 
@@ -56,7 +56,7 @@ const tests = {
     const nouvelle = modifier({ id: "a", nom: "A", favori: false, aEssayer: true }, "statut", "favorite", date);
     egal(JSON.stringify(nouvelle), JSON.stringify({
       id: "a", nom: "A", statut: "favorite",
-      historique: [{ date: "2026-10-27T09:12:00.000Z", champ: "statut", avant: "a-essayer", apres: "favorite" }],
+      historique: [{ date: "2026-10-27T09:12:00.000Z", champ: "statut", avant: "pas-testee", apres: "favorite" }],
     }));
   },
 
@@ -79,7 +79,8 @@ const tests = {
 
   "Historique : textes affichés"() {
     egal(formaterModification({ champ: "statut", avant: "favorite", apres: "a-essayer" }), "Statut : Favorite → À essayer");
-    egal(formaterModification({ champ: "statut", avant: "a-eviter", apres: "favorite" }), "Statut : Déjà cuisinée → Favorite");
+    egal(formaterModification({ champ: "statut", avant: "a-eviter", apres: "favorite" }), "Statut : Pas pour moi → Favorite");
+    egal(formaterModification({ champ: "statut", avant: "cuisinee", apres: "pas-testee" }), "Statut : Bonne → Pas testée");
     egal(formaterModification({ champ: "notes", avant: "", apres: "Moins de sucre" }), "Notes ajoutées : « Moins de sucre »");
     egal(formaterModification({ champ: "notes", avant: "Moins de sucre", apres: "" }), "Notes supprimées (c'était : « Moins de sucre »)");
     egal(formaterModification({ champ: "notes", avant: "A", apres: "B" }), "Notes modifiées (avant : « A »)");
@@ -242,11 +243,12 @@ const tests = {
     egal(groupes.map((g) => g.titre).join(","), "Cyril Lignac,Paul Bocuse,Sans chef");
   },
 
-  "Classer par statut : à essayer, déjà cuisinée, favorite (anciens formats compris)"() {
+  "Classer par statut : À essayer, Favorite, Bonne, Pas testée, Pas pour moi (anciens formats compris)"() {
     const groupes = classerRecettes([
       entree("a", { statut: "favorite" }), entree("b", { favori: true }), entree("c", {}), entree("d", { statut: "cuisinee" }),
+      entree("e", { statut: "a-eviter" }), entree("f", { statut: "a-essayer" }),
     ], "statut");
-    egal(groupes.map((g) => `${g.cle}:${g.entrees.length}`).join(","), "a-essayer:1,cuisinee:1,favorite:2");
+    egal(groupes.map((g) => `${g.titre}:${g.entrees.length}`).join(","), "À essayer:1,Favorite:2,Bonne:1,Pas testée:1,Pas pour moi:1");
   },
 
   "Classer par livre : titre de la fiche du livre, sinon celui de la recette"() {

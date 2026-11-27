@@ -1,21 +1,32 @@
 // CuiCui Cooking – mise en forme d'une recette en texte lisible
 // (affichage et partage). Fonctions pures, sans accès à la page.
 
-// Statuts possibles d'une recette, dans l'ordre d'affichage.
+// Statuts possibles d'une recette, dans l'ordre d'affichage (Classer par statut, filtres) :
+// d'abord la sélection et les avis positifs, puis les recettes sans avis, puis celles à ne pas refaire.
+// « Pas testée » est le statut par défaut : sa pastille affiche simplement « Statut ».
 export const STATUTS = [
-  { valeur: "a-essayer", icone: "📝", libelle: "À essayer" },
-  { valeur: "cuisinee", icone: "✅", libelle: "Déjà cuisinée" },
-  { valeur: "favorite", icone: "⭐", libelle: "Favorite" },
+  { valeur: "a-essayer", libelle: "À essayer" },
+  { valeur: "favorite", libelle: "Favorite" },
+  { valeur: "bonne", libelle: "Bonne" },
+  { valeur: "pas-testee", libelle: "Pas testée", pastille: "Statut" },
+  { valeur: "pas-pour-moi", libelle: "Pas pour moi" },
 ];
 
+// Ordre de la liste de choix sur la fiche : du neutre aux avis.
+export const ORDRE_CHOIX_STATUT = ["pas-testee", "a-essayer", "favorite", "bonne", "pas-pour-moi"];
+
+export const STATUT_PAR_DEFAUT = "pas-testee";
+
 // Statut d'une recette. Comprend aussi les anciens formats :
-// favori / aEssayer, et « a-eviter » (statut retiré, lu comme « déjà cuisinée »).
+// « cuisinee » (Déjà cuisinée, remplacé par trois avis) → Bonne ; « a-eviter » (à ne pas refaire) → Pas pour moi ;
+// favori / aEssayer (booléens) → Favorite, Bonne ou Pas testée. Sans statut : Pas testée.
 export function lireStatut(recette) {
   if (STATUTS.some((statut) => statut.valeur === recette.statut)) return recette.statut;
-  if (recette.statut === "a-eviter") return "cuisinee";
+  if (recette.statut === "cuisinee") return "bonne";
+  if (recette.statut === "a-eviter") return "pas-pour-moi";
   if (recette.favori === true) return "favorite";
-  if (recette.aEssayer === false) return "cuisinee";
-  return "a-essayer";
+  if (recette.aEssayer === false) return "bonne";
+  return STATUT_PAR_DEFAUT;
 }
 
 export const infosStatut = (valeur) => STATUTS.find((statut) => statut.valeur === valeur);
@@ -76,7 +87,7 @@ function criteres(livres) {
     statut: {
       groupe: (recette) => {
         const statut = infosStatut(lireStatut(recette));
-        return { cle: statut.valeur, titre: `${statut.icone} ${statut.libelle}` };
+        return { cle: statut.valeur, titre: statut.libelle };
       },
       rang: rangDans(ordreStatuts),
     },

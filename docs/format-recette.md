@@ -87,7 +87,7 @@ Une fois les fiches créées, le dossier de l'envoi est supprimé : les pages de
 | `ingredients` | liste d'objets | oui | Voir ci-dessous. |
 | `etapes` | liste de textes | oui | Une entrée par étape, dans l'ordre. |
 | `notes` | texte | non | Mes remarques personnelles, modifiables dans l'application. |
-| `statut` | texte | oui | Où j'en suis avec cette recette (voir ci-dessous). `a-essayer` pour une nouvelle recette. |
+| `statut` | texte | oui | Où j'en suis avec cette recette (voir ci-dessous). `pas-testee` pour une nouvelle recette. |
 | `historique` | liste d'objets | non | Journal des modifications de statut et de notes (voir ci-dessous). |
 | `photos` | objet | non | `source` : liste des photos d'origine ; `plat` : photo du plat ou `null`. |
 | `dateAjout` | texte | oui | Date au format `AAAA-MM-JJ`. |
@@ -96,13 +96,18 @@ Une fois les fiches créées, le dossier de l'envoi est supprimé : les pages de
 
 | Valeur | Affichage | Signification |
 |---|---|---|
-| `a-essayer` | 📝 À essayer | Jamais cuisinée. Apparaît dans l'onglet « À essayer ». |
-| `cuisinee` | ✅ Déjà cuisinée | Testée, correcte. |
-| `favorite` | ⭐ Favorite | Testée et adorée. Apparaît dans l'onglet « Favoris ». |
+| `pas-testee` | Pas testée (pastille « Statut », contour beige) | **Par défaut.** Jamais testée, aucun avis. Rien n'est affiché sur les cartes des listes. |
+| `a-essayer` | À essayer (rose terre cuite) | Ma sélection : je veux la tester bientôt. Onglet « À essayer ». |
+| `favorite` | Favorite (jaune) | Cuisinée et adorée. Onglet « Favoris ». |
+| `bonne` | Bonne (vert sauge) | Cuisinée, réussie, mais pas un coup de cœur. |
+| `pas-pour-moi` | Pas pour moi (gris ardoise) | Cuisinée, pas aimée : à ne pas refaire. |
+
+Ordre d'affichage (Classer par statut, filtres) : À essayer, Favorite, Bonne, Pas testée, Pas pour moi.
 
 Anciens formats, toujours compris par l'application :
-- `favori` et `aEssayer` (booléens) : la fiche passe au champ `statut` dès que le statut est changé dans l'application ;
-- `a-eviter` (statut retiré) : lu comme `cuisinee`.
+- `cuisinee` (Déjà cuisinée, remplacé par trois avis) : lu comme `bonne` ;
+- `a-eviter` (à ne pas refaire) : lu comme `pas-pour-moi` ;
+- `favori` et `aEssayer` (booléens) : `favori` → `favorite`, `aEssayer: false` → `bonne`, sinon `pas-testee`. La fiche passe au champ `statut` dès que le statut est changé dans l'application.
 
 ### `historique`
 
@@ -119,7 +124,7 @@ Exemple :
 
 ```json
 "historique": [
-  { "date": "2026-10-27T09:12:00.000Z", "champ": "statut", "avant": "a-essayer", "apres": "favorite" },
+  { "date": "2026-10-27T09:12:00.000Z", "champ": "statut", "avant": "pas-testee", "apres": "favorite" },
   { "date": "2026-10-27T09:15:00.000Z", "champ": "notes", "avant": "", "apres": "Moins de sucre" }
 ]
 ```

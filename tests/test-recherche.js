@@ -67,8 +67,9 @@ const tests = {
   },
 
   "Filtre statut, y compris les anciens formats"() {
-    egal(ids({ statuts: ["cuisinee"] }), "pates");
-    egal(ids({ statuts: ["a-essayer"] }), "creme-brulee,salade");
+    egal(ids({ statuts: ["bonne"] }), "pates");
+    egal(ids({ statuts: ["a-essayer"] }), "creme-brulee");
+    egal(ids({ statuts: ["pas-testee"] }), "salade");
   },
 
   "Filtre cuisine, sans tenir compte des majuscules ; sans cuisine : exclue"() {
@@ -83,7 +84,7 @@ const tests = {
   "Choix proposés : valeurs présentes, avec leur nombre, dans l'ordre"() {
     const choix = choixDeFiltres(entrees);
     egal(choix.categories.map((c) => `${c.titre} ${c.nombre}`).join(), "Entrée 1,Plat 2,Dessert 1");
-    egal(choix.statuts.map((c) => `${c.titre} ${c.nombre}`).join(), "📝 À essayer 2,✅ Déjà cuisinée 1,⭐ Favorite 1");
+    egal(choix.statuts.map((c) => `${c.titre} ${c.nombre}`).join(), "À essayer 1,Favorite 1,Bonne 1,Pas testée 1");
     egal(choix.cuisines.map((c) => `${c.cle} ${c.nombre}`).join(), "française 2,italienne 1");
     egal(choix.cuisines[0].titre, "Française");
   },
