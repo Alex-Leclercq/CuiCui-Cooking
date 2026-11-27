@@ -2806,3 +2806,19 @@ button.statut-choix {
 :root[data-theme="sombre"] .notification__action {
   color: #a8432b;
 }
+
+/* Mes recettes : « Sélectionner » réduit à son icône, à droite des 4 pastilles de classement,
+   pour que toute la rangée tienne sur la largeur du téléphone. */
+.classement--puces .puce--action {
+  margin-left: auto;
+  padding: 0 11px;
+}
+
+.classement--puces .puce__texte {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
