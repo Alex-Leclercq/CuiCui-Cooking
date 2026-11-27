@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.30.0";
+const VERSION = "0.31.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -92,6 +92,7 @@ const ICONES = {
   corbeille: ["M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"],
   fermer: ["M6 6l12 12M18 6 6 18"],
   coche: ["m5 12 5 5 9-10"],
+  etoile: ["m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3l-5.5 2.9 1-6.2L3 9.6l6.2-.9z"],
   soleil: ["M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", "M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"],
 };
 
@@ -106,6 +107,13 @@ function icone(nom) {
     chemin.setAttribute("d", trace);
     dessin.append(chemin);
   }
+  return dessin;
+}
+
+// Étoile pleine, jaune « bec », des recettes favorites (après le nom, dans la pastille).
+function etoilePleine() {
+  const dessin = icone("etoile");
+  dessin.classList.add("icone--etoile");
   return dessin;
 }
 
@@ -185,6 +193,8 @@ function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
     const statut = infosStatut(valeurStatut);
     const titre = el("span", { class: "lien-recette__titre" },
       el("strong", {}, nomRecette(entree)),
+      // Favorite : une petite étoile jaune juste après le nom, pour la repérer d'un coup d'œil.
+      valeurStatut === "favorite" && el("span", { class: "lien-recette__etoile", title: "Favorite", "aria-label": "Favorite" }, etoilePleine()),
       recettesDansLaListe.has(entree.id) && el("span", {
         class: "lien-recette__panier", title: "Dans la liste de courses", "aria-label": "Dans la liste de courses",
       }, icone("panier")));
@@ -699,7 +709,7 @@ function ouvrirMenuStatut(pastille, actuel, choisir) {
       if (valeur !== actuel) choisir(valeur);
     },
   },
-  el("span", { class: "statut-pastille", "data-statut": valeur }, infosStatut(valeur).libelle),
+  el("span", { class: "statut-pastille", "data-statut": valeur }, valeur === "favorite" && etoilePleine(), infosStatut(valeur).libelle),
   valeur === actuel && icone("coche")));
   const menu = el("div", { class: "menu-statut", role: "menu", "aria-label": "Statut de la recette" }, options);
 
@@ -1119,7 +1129,8 @@ async function vueRecette(id) {
   function afficherStatut() {
     const valeur = lireStatut(recette);
     const statut = infosStatut(valeur);
-    texteStatut.textContent = statut.pastille ?? statut.libelle;
+    // Favorite : l'étoile avant le mot, comme dans les listes.
+    texteStatut.replaceChildren(valeur === "favorite" ? etoilePleine() : "", statut.pastille ?? statut.libelle);
     choixStatut.dataset.statut = valeur; // couleur de la pastille
     choixStatut.setAttribute("aria-label", `Statut : ${statut.libelle}. Changer le statut`);
   }
