@@ -2772,3 +2772,37 @@ button.statut-choix {
 .lien-recette__etoile + .lien-recette__panier {
   margin-left: 4px;
 }
+
+/* Message court avec un bouton (« Annuler », « Voir la liste ») : on peut le toucher. */
+.notification--action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 6px 6px 16px;
+  text-align: left;
+  pointer-events: auto;
+}
+
+.notification__action {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #ffb59e;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notification__action:focus-visible {
+  outline: 2px solid #ffb59e;
+  outline-offset: 2px;
+}
+
+/* En sombre, le message est clair : bouton en terre cuite foncée pour rester lisible. */
+:root[data-theme="sombre"] .notification__action {
+  color: #a8432b;
+}
