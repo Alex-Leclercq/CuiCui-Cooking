@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.29.0";
+const VERSION = "0.30.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -941,22 +941,46 @@ async function vueLivre(idLivre) {
   return { contenu: el("div", {}, entete, contenu), rafraichir };
 }
 
+// Sections repliées dans Favoris et À essayer (par statut) : gardées en allant voir une recette puis
+// en revenant, tant que l'application est ouverte ; tout est de nouveau déplié à la prochaine ouverture.
+const sectionsRepliees = new Map();
+
 // Onglets « Favoris » et « À essayer » : les recettes d'un statut donné.
 // parCategorie : recettes rangées en sections par catégorie (Petit-déjeuner, Apéritif, Entrée…),
-// dans le même ordre que Mes recettes → Catégorie ; toutes les sections sont ouvertes.
+// dans le même ordre que Mes recettes → Catégorie, avec les mêmes titres pliables ; contrairement
+// à Mes recettes, toutes les sections sont ouvertes au départ, et chacune se plie ou se déplie
+// indépendamment des autres.
 function vueStatut(statut, titre, vide, { parCategorie = false } = {}) {
+  if (!sectionsRepliees.has(statut)) sectionsRepliees.set(statut, new Set());
+  const repliees = sectionsRepliees.get(statut);
   return async () => {
     const liste = el("div");
     const selection = creerSelection(() => rafraichir());
     const compteur = el("span", { class: "discret" });
     const barreSelection = el("div", { class: "classement" }, selection.boutonSelectionner);
+    // Plier ou déplier une section : son titre reste à la même place à l'écran.
+    async function basculer(cle) {
+      const vue = document.getElementById("vue");
+      const sectionDe = () => [...liste.querySelectorAll("section.groupe")].find((section) => section.dataset.cle === cle);
+      const avant = sectionDe()?.getBoundingClientRect().top;
+      if (!repliees.delete(cle)) repliees.add(cle);
+      await rafraichir();
+      const apres = sectionDe()?.getBoundingClientRect().top;
+      if (avant !== undefined && apres !== undefined) vue.scrollTop += apres - avant;
+    }
     async function rafraichir() {
       const entrees = (await stockage.lireRecettes()).filter((entree) => lireStatut(entree.recette) === statut);
       barreSelection.hidden = entrees.length === 0;
       compteur.textContent = entrees.length ? nombreRecettes(entrees.length) : "";
       if (!entrees.length) liste.replaceChildren(vide());
-      else if (parCategorie) liste.replaceChildren(...listeGroupee(classerRecettes(entrees, "categorie"), selection));
-      else liste.replaceChildren(...listeRecettes(entrees, selection));
+      else if (parCategorie) {
+        const groupes = classerRecettes(entrees, "categorie");
+        // Une seule catégorie : titre simple, sans pliage (comme Mes recettes).
+        liste.replaceChildren(...listeGroupee(groupes, selection, groupes.length > 1 ? {
+          estPlie: (cle) => repliees.has(cle),
+          basculer,
+        } : null));
+      } else liste.replaceChildren(...listeRecettes(entrees, selection));
     }
     await rafraichir();
     return {
@@ -1928,7 +1952,8 @@ const vues = {
     { parCategorie: true }),
   "/a-essayer": vueStatut("a-essayer", "À essayer", () =>
     pageVide("📝", "Aucune recette à essayer.",
-      "Sur l'écran d'une recette, choisissez « À essayer » dans la pastille de statut : elle rejoint ici votre sélection de recettes à tester.")),
+      "Sur l'écran d'une recette, choisissez « À essayer » dans la pastille de statut : elle rejoint ici votre sélection de recettes à tester."),
+    { parCategorie: true }),
   "/courses": vueCourses,
   "/reglages": vueReglages,
   "/photo": vuePhoto,
