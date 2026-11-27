@@ -20,7 +20,7 @@
   - le nombre de personnes ;
   - le chef ou l'auteur ;
   - la source : le livre d'origine ou le site internet.
-- **Statut de chaque recette :** sur l'écran d'une recette, la pastille colorée à côté de la catégorie ouvre la liste des statuts. Changer de statut demande deux gestes, ce qui évite les changements par erreur :
+- **Statut de chaque recette :** sur l'écran d'une recette, la pastille colorée à côté de la catégorie ouvre, juste en dessous (ou au-dessus en bas d'écran), le menu des statuts : une pastille colorée par statut et une coche sur le statut actuel ; toucher à côté, Échap ou le geste retour le ferment sans rien changer. Changer de statut demande deux gestes, ce qui évite les changements par erreur :
   - **Pas testée** (par défaut, pastille « Statut » en contour beige) : jamais cuisinée, aucun avis ; rien n'est affiché sur les cartes des listes ;
   - **À essayer** (rose) : ma sélection de recettes à tester bientôt, réunies dans l'onglet « À essayer » ;
   - **Favorite** (jaune) : cuisinée et adorée ; ces recettes sont dans l'onglet « Favoris », rangées par catégorie dans le même ordre que Mes recettes (Petit-déjeuner, Apéritif, Entrée, Plat…), toutes les sections ouvertes ;

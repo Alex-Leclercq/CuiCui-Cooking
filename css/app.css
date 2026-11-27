@@ -2610,3 +2610,105 @@ body[data-ecran="recette"] .vue {
 .soufflet > .message {
   margin: 8px 0 0;
 }
+
+/* ---- Menu des statuts (fiche recette), comme la maquette ----
+   La pastille est un bouton ; le menu, une carte blanche avec une pastille par statut. */
+button.statut-choix {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.statut-choix:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.menu-statut__fond {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+}
+
+.menu-statut {
+  position: fixed;
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(280px, calc(100vw - 16px));
+  padding: 6px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgb(46 36 32 / 0.2);
+  animation: menu-statut-ouverture 0.12s ease-out;
+}
+
+@keyframes menu-statut-ouverture {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-statut { animation: none; }
+}
+
+.menu-statut__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--texte);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-statut__option[aria-checked="true"] {
+  background: var(--fond);
+}
+
+.menu-statut__option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.menu-statut__option .icone {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.4;
+}
+
+/* Pastille d'un statut (menu), mêmes couleurs que la pastille de la fiche. */
+.statut-pastille {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statut-pastille[data-statut="pas-testee"] { border-color: #d8c9b6; color: #6b5d55; }
+.statut-pastille[data-statut="a-essayer"] { background: #f7dcd2; color: #7e2f1c; }
+.statut-pastille[data-statut="favorite"] { background: #f8e3b8; color: #6b4708; }
+.statut-pastille[data-statut="bonne"] { background: #dcebdd; color: #2f5e3a; }
+.statut-pastille[data-statut="pas-pour-moi"] { background: #e1e5ea; color: #3e4a57; }
+
+:root[data-theme="sombre"] .statut-pastille[data-statut="pas-testee"] { border-color: #4a403a; color: var(--texte-doux); }
+:root[data-theme="sombre"] .statut-pastille[data-statut="a-essayer"] { background: #5a2a1e; color: #ffd9cc; }
+:root[data-theme="sombre"] .statut-pastille[data-statut="favorite"] { background: #4d3a14; color: #fbe6bd; }
+:root[data-theme="sombre"] .statut-pastille[data-statut="bonne"] { background: #24402b; color: #d3ecd8; }
+:root[data-theme="sombre"] .statut-pastille[data-statut="pas-pour-moi"] { background: #2e3640; color: #d6dde5; }
+:root[data-theme="sombre"] .menu-statut { box-shadow: 0 12px 32px rgb(0 0 0 / 0.5); }
