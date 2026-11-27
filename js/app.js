@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.31.0";
+const VERSION = "0.31.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -191,13 +191,19 @@ function cartesRecettes(entrees, details = detailsParDefaut, selection = null) {
   return el("ul", { class: "liste-recettes" }, entrees.map((entree) => {
     const valeurStatut = lireStatut(entree.recette);
     const statut = infosStatut(valeurStatut);
-    const titre = el("span", { class: "lien-recette__titre" },
-      el("strong", {}, nomRecette(entree)),
-      // Favorite : une petite étoile jaune juste après le nom, pour la repérer d'un coup d'œil.
+    // Icônes après le nom : l'étoile des favorites, puis le panier si la recette est dans la liste de courses.
+    const icones = [
       valeurStatut === "favorite" && el("span", { class: "lien-recette__etoile", title: "Favorite", "aria-label": "Favorite" }, etoilePleine()),
       recettesDansLaListe.has(entree.id) && el("span", {
         class: "lien-recette__panier", title: "Dans la liste de courses", "aria-label": "Dans la liste de courses",
-      }, icone("panier")));
+      }, icone("panier")),
+    ].filter(Boolean);
+    // Les icônes suivent le dernier mot du nom, même quand il passe à la ligne : le dernier mot et les
+    // icônes sont insécables (elles ne se retrouvent jamais seules sur une ligne).
+    const nom = nomRecette(entree);
+    const coupure = nom.lastIndexOf(" ");
+    const titre = el("span", { class: "lien-recette__titre" }, el("strong", {},
+      icones.length ? [nom.slice(0, coupure + 1), el("span", { class: "lien-recette__fin" }, nom.slice(coupure + 1), ...icones)] : nom));
     // Ligne du bas : durée (préparation + cuisson), nombre de personnes, statut en couleur.
     const { tempsPreparation, tempsCuisson, portions } = entree.recette;
     const minutes = (Number(tempsPreparation) || 0) + (Number(tempsCuisson) || 0);

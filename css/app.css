@@ -2750,3 +2750,25 @@ button.statut-choix {
 .statut-pastille[data-statut="favorite"] .icone--etoile {
   stroke: #8a5a0c;
 }
+
+/* Titre d'une carte : un texte qui coule normalement ; les icônes (étoile, panier) suivent
+   le dernier mot, même sur deux lignes, sans en être séparées. */
+.lien-recette__titre {
+  display: block;
+}
+
+.lien-recette__fin {
+  white-space: nowrap;
+}
+
+.lien-recette__etoile,
+.lien-recette__panier {
+  display: inline-flex;
+  margin-left: 6px;
+  vertical-align: -2px;
+}
+
+.lien-recette__panier + .lien-recette__panier,
+.lien-recette__etoile + .lien-recette__panier {
+  margin-left: 4px;
+}
