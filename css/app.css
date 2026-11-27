@@ -2493,3 +2493,78 @@ body[data-ecran="recette"] .vue {
 :root[data-theme="sombre"] .statut-choix[data-statut="pas-pour-moi"] { background: #2e3640; color: #d6dde5; }
 :root[data-theme="sombre"] .statut-texte[data-statut="bonne"] { color: #8cc59a; }
 :root[data-theme="sombre"] .statut-texte[data-statut="pas-pour-moi"] { color: #aab6c3; }
+
+/* Couverture d'un livre : un bouton qui l'ouvre en grand. */
+.livre__agrandir {
+  flex: 0 0 112px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px 10px 10px 4px;
+  background: none;
+  cursor: zoom-in;
+}
+
+.livre__agrandir .couverture {
+  width: 100%;
+}
+
+.livre__agrandir:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Visionneuse plein écran, sur le fond de l'appli. */
+.visionneuse {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: calc(72px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+  background: var(--fond);
+  touch-action: none;
+  user-select: none;
+}
+
+.visionneuse__image {
+  max-width: 100%;
+  max-height: calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  border-radius: 4px 10px 10px 4px;
+  box-shadow: 0 10px 30px rgb(46 36 32 / 0.25);
+  transform-origin: center;
+  transition: transform 0.15s ease-out;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+/* Pendant un geste, l'image suit le doigt sans retard. */
+.visionneuse__image--geste {
+  transition: none;
+}
+
+.visionneuse__fermer {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--texte);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  cursor: pointer;
+}
+
+.visionneuse__fermer .icone {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+}
+
+.visionneuse-ouverte .navigation {
+  display: none;
+}
