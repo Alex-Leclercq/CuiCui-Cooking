@@ -2871,3 +2871,23 @@ button.statut-choix {
     animation-timing-function: steps(1, end);
   }
 }
+
+/* Couverture en cours de lecture : un cadre neutre, sans titre, puis l'image en fondu.
+   Le titre sur fond coloré ne sert qu'aux livres sans couverture. */
+.couverture--attente {
+  background: var(--surface-douce);
+}
+
+.couverture__fondu {
+  animation: couverture-fondu 0.2s ease-out;
+}
+
+@keyframes couverture-fondu {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .couverture__fondu {
+    animation: none;
+  }
+}
