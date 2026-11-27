@@ -151,7 +151,7 @@ Les tests s'ouvrent dans le navigateur :
 
 Après chaque mise à jour de `main`, l'application cherche la nouvelle version à chaque ouverture et à chaque retour dessus. Elle se recharge d'elle-même si elle vient de s'ouvrir, sinon elle affiche un bandeau **Nouvelle version disponible → Mettre à jour**.
 
-Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessus), puis dans l'application **Réglages → Connexion à GitHub**, coller le jeton et appuyer sur **Enregistrer et tester**.
+Pour la connecter aux recettes : créer le jeton (voir « Sécurité » ci-dessus), puis dans l'application **Réglages → Connexion à GitHub**, coller le jeton et appuyer sur **Enregistrer et tester**. Une fois connectée, la zone **Connexion à GitHub** est repliée (son titre indique « Connecté à … ») pour éviter de modifier un champ par mégarde : la flèche la déplie. **Oublier le jeton** demande une confirmation.
 
 ## Feuille de route
 

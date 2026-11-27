@@ -2568,3 +2568,45 @@ body[data-ecran="recette"] .vue {
 .visionneuse-ouverte .navigation {
   display: none;
 }
+
+/* Réglages : zone « Connexion à GitHub » en soufflet (titre + état, flèche pour déplier). */
+.soufflet__titre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.soufflet__textes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.soufflet__etat {
+  overflow-wrap: anywhere;
+}
+
+.soufflet__titre:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.soufflet__contenu {
+  margin-top: 12px;
+}
+
+.soufflet > .message {
+  margin: 8px 0 0;
+}
