@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.27.1";
+const VERSION = "0.28.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -1288,15 +1288,33 @@ async function vueReglages() {
     message.className = `message message--${type}`;
   };
 
-  const formulaire = el("form", { class: "carte formulaire" },
-    el("p", {}, el("strong", {}, "Connexion à GitHub")),
+  // Connexion à GitHub, en soufflet : repliée dès que l'appli est connectée (pour ne rien modifier
+  // par mégarde), ouverte tant qu'il faut saisir le jeton. Le titre rappelle l'état de la connexion.
+  const etatConnexion = el("span", { class: "discret soufflet__etat" });
+  const afficherEtatConnexion = (connecte, depot) => {
+    etatConnexion.textContent = connecte ? `Connecté à ${depot}` : "Non connecté";
+  };
+  afficherEtatConnexion(config?.aUnJeton, `${config?.proprietaire ?? ""}/${config?.depot ?? ""}`);
+  const contenuConnexion = el("div", { class: "soufflet__contenu", id: "connexion-github", hidden: !!config?.aUnJeton });
+  const titreConnexion = el("button", {
+    type: "button", class: "soufflet__titre", "aria-controls": "connexion-github", "aria-expanded": String(!config?.aUnJeton),
+  }, el("span", { class: "soufflet__textes" }, el("strong", {}, "Connexion à GitHub"), etatConnexion),
+  el("span", { class: "chevron", "aria-hidden": "true" }));
+  titreConnexion.addEventListener("click", () => {
+    contenuConnexion.hidden = !contenuConnexion.hidden;
+    titreConnexion.setAttribute("aria-expanded", String(!contenuConnexion.hidden));
+  });
+
+  const formulaire = el("form", { class: "carte formulaire soufflet" }, titreConnexion, contenuConnexion);
+  contenuConnexion.append(
     champ("Propriétaire du dépôt", { name: "proprietaire", required: true, autocomplete: "off", autocapitalize: "off", spellcheck: "false", value: config?.proprietaire ?? DEPOT_PAR_DEFAUT.proprietaire }),
     champ("Dépôt des recettes", { name: "depot", required: true, autocomplete: "off", autocapitalize: "off", spellcheck: "false", value: config?.depot ?? DEPOT_PAR_DEFAUT.depot }),
     el("label", { class: "champ" }, el("span", {}, "Jeton d'accès"), champJeton),
     el("p", { class: "discret" },
       "Jeton « fine-grained » limité à ce seul dépôt, permission Contents en lecture et écriture. Il reste sur ce téléphone."),
-    el("div", { class: "barre-actions" }, el("button", { type: "submit", class: "bouton" }, "Enregistrer et tester"), boutonOublier),
-    message);
+    el("div", { class: "barre-actions" }, el("button", { type: "submit", class: "bouton" }, "Enregistrer et tester"), boutonOublier));
+  // Le message de résultat reste visible même zone repliée.
+  formulaire.append(message);
 
   formulaire.addEventListener("submit", async (evenement) => {
     evenement.preventDefault();
@@ -1312,6 +1330,7 @@ async function vueReglages() {
       });
       champJeton.value = "";
       afficherJetonEnregistre(true);
+      afficherEtatConnexion(true, infos.nomComplet);
       if (infos.prive) afficherMessage(`Connecté à ${infos.nomComplet}.`, "succes");
       else afficherMessage(`Connecté à ${infos.nomComplet}, mais ce dépôt est PUBLIC : vos recettes sont visibles de tous.`, "erreur");
       synchro.synchroniser().catch(() => {});
@@ -1323,8 +1342,11 @@ async function vueReglages() {
   });
 
   boutonOublier.addEventListener("click", async () => {
+    // Geste lourd (il faudra ressaisir le jeton) : une confirmation évite un appui par erreur.
+    if (!confirm("Oublier le jeton ? L'appli ne se synchronisera plus avec GitHub tant que vous ne l'aurez pas ressaisi.")) return;
     await synchro.oublierJeton();
     afficherJetonEnregistre(false);
+    afficherEtatConnexion(false);
     afficherMessage("Jeton supprimé de ce téléphone. Révoquez-le aussi sur GitHub si vous ne l'utilisez plus.", "info");
   });
 
