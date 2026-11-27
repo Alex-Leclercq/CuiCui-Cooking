@@ -2712,3 +2712,41 @@ button.statut-choix {
 :root[data-theme="sombre"] .statut-pastille[data-statut="bonne"] { background: #24402b; color: #d3ecd8; }
 :root[data-theme="sombre"] .statut-pastille[data-statut="pas-pour-moi"] { background: #2e3640; color: #d6dde5; }
 :root[data-theme="sombre"] .menu-statut { box-shadow: 0 12px 32px rgb(0 0 0 / 0.5); }
+
+/* Étoile des recettes favorites : pleine, jaune « bec », juste après le nom et dans la pastille. */
+.icone--etoile {
+  fill: var(--bec);
+  stroke: #b5791f;
+  stroke-width: 1.2;
+}
+
+.lien-recette__etoile {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.lien-recette__etoile .icone {
+  width: 15px;
+  height: 15px;
+}
+
+.statut-choix__texte,
+.statut-pastille {
+  gap: 6px;
+}
+
+.statut-choix__texte {
+  display: inline-flex;
+  align-items: center;
+}
+
+.statut-choix__texte .icone,
+.statut-pastille .icone {
+  width: 14px;
+  height: 14px;
+}
+
+.statut-choix[data-statut="favorite"] .icone--etoile,
+.statut-pastille[data-statut="favorite"] .icone--etoile {
+  stroke: #8a5a0c;
+}
