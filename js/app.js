@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.31.1";
+const VERSION = "0.32.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -127,17 +127,27 @@ const ligneTitre = (titre, compteur) =>
   el("div", { class: "entete-vue__titre" }, el("h2", {}, titre), compteur);
 
 // Court message en bas de l'écran, visible même au milieu d'une page qu'on fait défiler.
+// action (facultative) : { libelle, faire } ajoute un bouton au message (« Annuler », « Voir la liste »),
+// qui reste alors affiché plus longtemps (6 s) pour laisser le temps de le toucher.
 let minuterieNotification = null;
-function notifier(texte, type = "info") {
+function notifier(texte, type = "info", action = null) {
   let bulle = document.querySelector(".notification");
   if (!bulle) {
     bulle = el("div", { class: "notification", role: "status" });
     document.body.append(bulle);
   }
-  bulle.textContent = texte;
-  bulle.className = `notification notification--${type} notification--visible`;
+  const masquer = () => bulle.classList.remove("notification--visible", "notification--action");
+  bulle.replaceChildren(el("span", {}, texte), action && el("button", {
+    type: "button", class: "notification__action",
+    onclick: () => {
+      clearTimeout(minuterieNotification);
+      masquer();
+      action.faire();
+    },
+  }, action.libelle));
+  bulle.className = `notification notification--${type} notification--visible${action ? " notification--action" : ""}`;
   clearTimeout(minuterieNotification);
-  minuterieNotification = setTimeout(() => bulle.classList.remove("notification--visible"), 3000);
+  minuterieNotification = setTimeout(masquer, action ? 6000 : 3000);
 }
 
 const pageVide = (icone, titre, explication, ...actions) =>
@@ -1196,9 +1206,10 @@ async function vueRecette(id) {
     afficherBoutonListe();
   }
 
-  // Liste de courses : une icône panier en haut de l'écran (avant l'écran allumé et le partage).
-  // La recette y entre pour le nombre de personnes affiché. Panier vide : à ajouter ; vert coché :
-  // déjà dans la liste pour ce nombre (un appui y mène) ; point terre cuite : nombre changé (un appui met à jour).
+  // Liste de courses : une icône panier en haut de l'écran (avant l'écran allumé et le partage), qui
+  // fonctionne comme un interrupteur. Panier vide : un appui ajoute la recette pour le nombre de personnes
+  // affiché (message avec « Voir la liste ») ; vert coché : un appui la retire (message avec « Annuler »,
+  // qui la remet telle quelle, articles cochés compris) ; point terre cuite : nombre changé, un appui met à jour.
   const message = el("p", { class: "message", role: "status" });
   const boutonListe = el("button", { type: "button", class: "bouton-icone bouton--courses" });
   let dansLaListe = (await lireListeCourses()).recettes.find((choix) => choix.id === id) ?? null;
@@ -1206,16 +1217,39 @@ async function vueRecette(id) {
   function afficherBoutonListe() {
     const etat = !dansLaListe ? "ajouter" : memeNombre() ? "dedans" : "mettre-a-jour";
     const libelle = etat === "ajouter" ? "Ajouter aux courses"
-      : etat === "dedans" ? "Dans la liste de courses : voir la liste" : "Mettre à jour la liste de courses";
+      : etat === "dedans" ? "Dans la liste de courses : retirer de la liste" : "Mettre à jour la liste de courses";
     boutonListe.dataset.etat = etat;
     boutonListe.setAttribute("aria-label", libelle);
     boutonListe.title = libelle;
     boutonListe.replaceChildren(icone(etat === "dedans" ? "panierCoche" : "panier"),
       etat === "mettre-a-jour" ? el("span", { class: "bouton--courses__point", "aria-hidden": "true" }) : "");
   }
+  const voirLaListe = { libelle: "Voir la liste", faire: () => allerVersOnglet("/courses") };
   boutonListe.addEventListener("click", async () => {
     if (memeNombre()) {
-      allerVersOnglet("/courses");
+      // Retirer, en gardant de quoi tout remettre : la place dans la liste, le nombre de personnes et
+      // les articles déjà cochés pour cette recette (leurs clés commencent par l'identifiant de la recette).
+      const avant = await lireListeCourses();
+      const rang = avant.recettes.findIndex((choix) => choix.id === id);
+      const choix = avant.recettes[rang];
+      const coches = avant.coches.filter((cle) => cle.startsWith(`${id}|`));
+      await modifierListeCourses((actuelle) => retirerDeLaListe(actuelle, id));
+      dansLaListe = null;
+      afficherBoutonListe();
+      notifier("Retirée de la liste de courses.", "info", {
+        libelle: "Annuler",
+        faire: async () => {
+          const liste = await modifierListeCourses((actuelle) => {
+            if (actuelle.recettes.some((autre) => autre.id === id)) return actuelle;
+            const recettes = [...actuelle.recettes];
+            recettes.splice(Math.min(rang, recettes.length), 0, choix);
+            return { ...actuelle, recettes, coches: [...new Set([...actuelle.coches, ...coches])] };
+          });
+          dansLaListe = liste.recettes.find((autre) => autre.id === id) ?? null;
+          afficherBoutonListe();
+          notifier("Remise dans la liste de courses.", "info", voirLaListe);
+        },
+      });
       return;
     }
     const miseAJour = !!dansLaListe;
@@ -1224,7 +1258,7 @@ async function vueRecette(id) {
     afficherBoutonListe();
     const pour = origine ? ` pour ${nombrePersonnes(personnes)}` : "";
     // Le bouton est en haut : la confirmation s'affiche en bas de l'écran, visible où qu'on soit dans la recette.
-    notifier(miseAJour ? `Liste de courses mise à jour${pour}.` : `Ajoutée à la liste de courses${pour}.`);
+    notifier(miseAJour ? `Liste de courses mise à jour${pour}.` : `Ajoutée à la liste de courses${pour}.`, "info", voirLaListe);
   });
   const changerPersonnes = (nombre) => {
     personnes = Math.min(Math.max(nombre, PERSONNES_MIN), PERSONNES_MAX);
