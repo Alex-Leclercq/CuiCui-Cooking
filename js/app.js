@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.34.0";
+const VERSION = "0.34.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -274,6 +274,15 @@ function vignette(entree) {
 function listeRecettes(entrees, selection = null) {
   const [groupe] = classerRecettes(entrees, "nom");
   return [cartesRecettes(groupe?.entrees ?? [], undefined, selection)];
+}
+
+// Clé de la section repliée où se trouve la carte d'une recette (null si la carte est visible ou absente) :
+// en revenant d'une recette lue en feuilletant, sa section est ouverte pour la montrer.
+function sectionRepliee(liste, id) {
+  const carte = [...liste.querySelectorAll("a.lien-recette")]
+    .find((lien) => lien.getAttribute("href") === `#${PREFIXE_RECETTE}${encodeURIComponent(id)}`);
+  const section = carte?.closest("section.groupe");
+  return section && carte.closest("[hidden]") ? section.dataset.cle : null;
 }
 
 // Liste rangée en sections (catégorie, cuisine, chef, statut…).
@@ -693,6 +702,14 @@ async function vueRecettes() {
   return {
     contenu: el("div", {}, vueListe, ecranFiltres),
     rafraichir,
+    // Retour d'une recette dont la section est repliée : on ouvre cette section (l'accordéon referme l'autre).
+    async montrerRecette(id) {
+      const cle = sectionRepliee(liste, id);
+      if (cle === null) return;
+      if (rechercheActive(filtresRecettes)) plisRecherche.delete(cle);
+      else sectionOuverte = cle;
+      await rafraichir();
+    },
     quitter() {
       selection.quitter();
       masquerFiltres();
@@ -707,7 +724,7 @@ async function vueRecettes() {
 // résultats). Les sections repliées comptent aussi. Flèches ← → au clavier.
 // La pile est relevée au moment où l'on touche une carte de recette ; « actuelle » suit la recette
 // affichée, pour qu'une recette ouverte autrement (courses, lien) ne soit pas feuilletée.
-let pileFeuilletage = null; // { ids, livre, actuelle }
+let pileFeuilletage = null; // { ids, livre, actuelle, depart (la recette touchée dans la liste) }
 let sensEntree = 0; // +1 : la nouvelle page arrive de la droite ; -1 : de la gauche
 
 document.addEventListener("click", (evenement) => {
@@ -719,16 +736,59 @@ document.addEventListener("click", (evenement) => {
   }
   const idDe = (lien) => identifiant(lien.getAttribute("href").slice(1), PREFIXE_RECETTE);
   const ids = [...new Set([...document.querySelectorAll("#vue a.lien-recette")].map(idDe).filter(Boolean))];
-  pileFeuilletage = { ids, livre: !!routeAffichee?.startsWith(PREFIXE_LIVRE), actuelle: idDe(carte) };
+  pileFeuilletage = { ids, livre: !!routeAffichee?.startsWith(PREFIXE_LIVRE), actuelle: idDe(carte), depart: idDe(carte) };
   sensEntree = 0;
 }, true);
 
 const ASTUCE_FEUILLETER = "cuicui.astuceFeuilleter";
 
+// Photos de plat prêtes à afficher (id → promesse de l'adresse) : la recette affichée et ses voisines
+// dans le feuilletage, préparées à l'avance (image décodée) pour que la page tourne sans attente.
+const adressesPhotos = new Map();
+
+function adressePhoto(id, nom) {
+  if (!adressesPhotos.has(id)) {
+    adressesPhotos.set(id, synchro.photo(id, nom)
+      .then((image) => (image ? URL.createObjectURL(image) : null))
+      .catch(() => null)
+      .then((adresse) => {
+        if (!adresse) adressesPhotos.delete(id); // réessayée la prochaine fois (hors ligne…)
+        return adresse;
+      }));
+  }
+  return adressesPhotos.get(id);
+}
+
+// Libère les photos qui ne sont plus utiles (ni affichée, ni voisine).
+function garderPhotos(ids) {
+  for (const [id, promesse] of adressesPhotos) {
+    if (ids.includes(id)) continue;
+    adressesPhotos.delete(id);
+    promesse.then((adresse) => adresse && URL.revokeObjectURL(adresse));
+  }
+}
+
+async function preparerRecetteVoisine(id) {
+  const entree = await stockage.lireRecette(id);
+  const adresse = entree?.recette?.photos?.plat && await adressePhoto(id, entree.recette.photos.plat);
+  if (!adresse) return;
+  const image = new Image();
+  image.src = adresse;
+  await image.decode();
+}
+
 function activerFeuilletage(article, id) {
   const pile = pileFeuilletage;
   const rang = pile && pile.actuelle === id ? pile.ids.indexOf(id) : -1;
-  if (rang < 0 || pile.ids.length < 2) return () => {};
+  if (rang < 0 || pile.ids.length < 2) {
+    garderPhotos([id]);
+    return () => {};
+  }
+
+  // Les recettes voisines sont préparées pendant la lecture (photo comprise).
+  const voisines = [pile.ids[rang - 1], pile.ids[rang + 1]].filter(Boolean);
+  garderPhotos([id, ...voisines]);
+  for (const voisine of voisines) preparerRecetteVoisine(voisine).catch(() => {});
 
   // Arrivée de la page : glissée depuis le côté, après un feuilletage.
   if (sensEntree) article.classList.add(sensEntree > 0 ? "recette--entree-droite" : "recette--entree-gauche");
@@ -1130,6 +1190,12 @@ function vueStatut(statut, titre, vide, { parCategorie = false } = {}) {
         enteteFige(ligneTitre(titre, compteur), barreSelection),
         selection.message, liste, selection.barre),
       rafraichir,
+      async montrerRecette(id) {
+        const cle = sectionRepliee(liste, id);
+        if (cle === null) return;
+        repliees.delete(cle);
+        await rafraichir();
+      },
       quitter: selection.quitter,
     };
   };
@@ -1241,15 +1307,12 @@ async function vueRecette(id) {
   // Photo du plat (pas la page du livre) : chargée sans bloquer l'affichage de la recette.
   // Le cadre est réservé dès l'ouverture quand la recette a une photo : l'écran ne saute pas à son arrivée.
   const photoPlat = el("figure", { class: "photo-plat", hidden: !recette.photos?.plat });
-  synchro.photo(id, recette.photos?.plat).then((image) => {
-    if (!image) {
-      photoPlat.hidden = true;
+  adressePhoto(id, recette.photos?.plat).then((adresse) => {
+    if (!adresse) {
+      photoPlat.hidden = true; // pas de photo, ou hors ligne et photo pas encore téléchargée
       return;
     }
-    const adresse = URL.createObjectURL(image);
     photoPlat.replaceChildren(el("img", { src: adresse, alt: `Photo : ${recette.nom ?? id}` }));
-  }).catch(() => {
-    photoPlat.hidden = true; // hors ligne et photo pas encore téléchargée
   });
 
   // Choix du statut : une pastille colorée qui ouvre le menu des statuts (voir ouvrirMenuStatut).
@@ -2220,7 +2283,7 @@ async function afficher() {
   const numero = ++numeroAffichage;
   const route = routeCourante();
   await lireListeCourses(); // pour l'icône 🛒 des recettes déjà dans la liste
-  const { contenu, rafraichir, quitter } = await chargerVue(route);
+  const { contenu, rafraichir, quitter, montrerRecette } = await chargerVue(route);
   if (numero !== numeroAffichage) return; // une autre page a été demandée entre-temps
 
   quitterVue?.();
@@ -2237,7 +2300,12 @@ async function afficher() {
   document.body.dataset.ecran = estRecette(route) ? "recette" : route.startsWith(PREFIXE_LIVRE) ? "livre" : "onglet";
   suivreHauteurEntete(conteneur);
   conteneur.scrollTop = estRecette(route) ? 0 : positionsDefilement.get(route) ?? 0;
-  if (recetteQuittee) retrouverRecette(conteneur, recetteQuittee);
+  if (recetteQuittee && !estRecette(route)) {
+    await montrerRecette?.(recetteQuittee);
+    if (numero !== numeroAffichage) return;
+    const feuilletee = pileFeuilletage?.actuelle === recetteQuittee && pileFeuilletage.depart !== recetteQuittee;
+    retrouverRecette(conteneur, recetteQuittee, feuilletee);
+  }
 
   // Le détail d'une recette ou d'un livre reste rattaché à l'onglet « Recettes ».
   const onglet = estDetail(route) || route === "/photo" ? "/" : route;
@@ -2262,10 +2330,15 @@ function suivreHauteurEntete(conteneur) {
 
 // En revenant d'une recette : sa carte est ramenée à l'écran si elle n'y est pas
 // (liste reclassée ou modifiée entre-temps).
-function retrouverRecette(conteneur, id) {
+// briller : après un feuilletage, la carte s'éclaire un instant pour montrer où l'on s'est arrêté.
+function retrouverRecette(conteneur, id, briller = false) {
   const lien = `#/recette/${encodeURIComponent(id)}`;
   const carte = [...conteneur.querySelectorAll("a.lien-recette")].find((a) => a.getAttribute("href") === lien);
   if (!carte || !carte.offsetParent) return; // absente, ou dans une section pliée
+  if (briller) {
+    carte.classList.add("lien-recette--retrouvee");
+    carte.addEventListener("animationend", () => carte.classList.remove("lien-recette--retrouvee"), { once: true });
+  }
   const zone = conteneur.getBoundingClientRect();
   const hautVisible = conteneur.querySelector(".entete-vue")?.getBoundingClientRect().bottom ?? zone.top;
   const basVisible = document.querySelector(".navigation").getBoundingClientRect().top;

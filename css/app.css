@@ -2854,3 +2854,20 @@ button.statut-choix {
     animation: none;
   }
 }
+
+/* Retour d'un feuilletage : la carte de la dernière recette lue s'éclaire un instant. */
+.lien-recette--retrouvee {
+  animation: carte-retrouvee 1.4s ease-out;
+}
+
+@keyframes carte-retrouvee {
+  0%, 30% { box-shadow: 0 0 0 3px var(--accent), var(--ombre); }
+  100% { box-shadow: 0 0 0 3px transparent, var(--ombre); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lien-recette--retrouvee {
+    animation-duration: 2s;
+    animation-timing-function: steps(1, end);
+  }
+}
