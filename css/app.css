@@ -2822,3 +2822,35 @@ button.statut-choix {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* ---- Feuilleter les recettes ----
+   Le geste horizontal est laissé à l'application, le vertical fait défiler la page.
+   La nouvelle recette arrive du côté vers lequel on a glissé. */
+.recette {
+  touch-action: pan-y;
+}
+
+.recette--entree-droite {
+  animation: recette-entree-droite 0.18s ease-out;
+}
+
+.recette--entree-gauche {
+  animation: recette-entree-gauche 0.18s ease-out;
+}
+
+@keyframes recette-entree-droite {
+  from { transform: translateX(30%); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes recette-entree-gauche {
+  from { transform: translateX(-30%); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recette--entree-droite,
+  .recette--entree-gauche {
+    animation: none;
+  }
+}
