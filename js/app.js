@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.34.1";
+const VERSION = "0.34.2";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -387,13 +387,78 @@ function creerSelection(reafficher) {
   };
 }
 
-// Couverture d'un livre : l'image dès qu'elle est disponible, sinon le titre sur fond coloré.
+// Couvertures prêtes à afficher (image lue sur le téléphone et décodée), gardées tant que l'application
+// est ouverte : au retour d'un livre, ou quand la liste est redessinée après une synchronisation,
+// elles s'affichent aussitôt, sans repasser par le titre sur fond coloré.
+const couverturesPretes = new Map(); // id du livre → { empreinte, adresse } (adresse null : livre sans couverture)
+const couverturesEnCours = new Map(); // id du livre → promesse de { empreinte, adresse } ou null
+
+// Décode une image à l'avance pour qu'elle s'affiche d'un coup ; jamais plus de 500 ms d'attente
+// (certains navigateurs ne décodent pas tant que la page est en arrière-plan).
+function decoderImage(adresse) {
+  const image = new Image();
+  image.src = adresse;
+  return Promise.race([image.decode().catch(() => {}), new Promise((fini) => setTimeout(fini, 500))]);
+}
+
+// Empreinte de la couverture actuelle du livre (elle change si la couverture est remplacée).
+async function empreinteCouverture(idLivre) {
+  const entree = await stockage.lireLivre(idLivre);
+  const nom = entree?.livre?.couverture;
+  return nom ? entree.fichiers?.[nom] ?? null : null;
+}
+
+// Prépare la couverture d'un livre ; renvoie { empreinte, adresse }, ou null si elle n'existe pas
+// ou n'est pas encore sur le téléphone (hors ligne).
+function chargerCouverture(idLivre) {
+  if (!couverturesEnCours.has(idLivre)) {
+    const promesse = (async () => {
+      const empreinte = await empreinteCouverture(idLivre);
+      const deja = couverturesPretes.get(idLivre);
+      if (deja && deja.empreinte === empreinte) return deja;
+      if (!empreinte) {
+        const absente = { empreinte: null, adresse: null };
+        couverturesPretes.set(idLivre, absente);
+        return absente;
+      }
+      const image = await synchro.couverture(idLivre);
+      if (!image) return null; // pas encore sur le téléphone : réessayée la prochaine fois
+      const adresse = URL.createObjectURL(image);
+      await decoderImage(adresse);
+      if (deja?.adresse) URL.revokeObjectURL(deja.adresse);
+      const prete = { empreinte, adresse };
+      couverturesPretes.set(idLivre, prete);
+      return prete;
+    })().catch(() => null).finally(() => couverturesEnCours.delete(idLivre));
+    couverturesEnCours.set(idLivre, promesse);
+  }
+  return couverturesEnCours.get(idLivre);
+}
+
+// Attend que les couvertures soient prêtes, au plus « delai » millisecondes : l'étagère s'affiche
+// alors d'un coup, complète ; une couverture plus lente arrivera ensuite en fondu.
+const attendreCouvertures = (ids, delai = 350) => Promise.race([
+  Promise.all(ids.map(chargerCouverture)),
+  new Promise((fini) => setTimeout(fini, delai)),
+]);
+
+// Couverture d'un livre. Déjà prête : affichée tout de suite. Sinon, un cadre de couleur neutre,
+// puis l'image en fondu ; le titre sur fond coloré ne reste que pour un livre sans couverture.
 function couvertureLivre(idLivre, titre) {
-  const cadre = el("div", { class: "couverture" }, el("span", { class: "couverture__titre" }, titre));
+  const cadre = el("div", { class: "couverture" });
+  const image = (adresse, fondu) => el("img", { src: adresse, alt: `Couverture : ${titre}`, class: fondu ? "couverture__fondu" : null });
+  const sansImage = () => cadre.replaceChildren(el("span", { class: "couverture__titre" }, titre));
+  const prete = idLivre && couverturesPretes.get(idLivre);
+  if (prete?.adresse) cadre.append(image(prete.adresse, false));
+  else if (prete || !idLivre) sansImage();
+  else cadre.classList.add("couverture--attente");
   if (idLivre) {
-    synchro.couverture(idLivre).then((image) => {
-      if (!image) return;
-      cadre.replaceChildren(el("img", { src: URL.createObjectURL(image), alt: `Couverture : ${titre}` }));
+    // Vérifie aussi qu'une couverture déjà affichée n'a pas été remplacée entre-temps.
+    chargerCouverture(idLivre).then((nouvelle) => {
+      cadre.classList.remove("couverture--attente");
+      if (!nouvelle?.adresse) {
+        if (prete?.adresse || !prete) sansImage();
+      } else if (nouvelle.adresse !== prete?.adresse) cadre.replaceChildren(image(nouvelle.adresse, true));
     });
   }
   return cadre;
@@ -671,7 +736,10 @@ async function vueRecettes() {
     const critere = choix.value;
     if (critere === "nom") liste.replaceChildren(...listeRecettes(entrees, selection));
     // En mode sélection ou pendant une recherche, l'étagère laisse place aux recettes rangées par livre.
-    else if (critere === "livre" && !selection.active() && !filtree) liste.replaceChildren(etagere(entrees, livres));
+    else if (critere === "livre" && !selection.active() && !filtree) {
+      await attendreCouvertures(livres.map((entree) => entree.id));
+      liste.replaceChildren(etagere(entrees, livres));
+    }
     else {
       const groupes = classerRecettes(entrees, critere, titresLivres);
       if (!filtree) {
@@ -771,10 +839,7 @@ function garderPhotos(ids) {
 async function preparerRecetteVoisine(id) {
   const entree = await stockage.lireRecette(id);
   const adresse = entree?.recette?.photos?.plat && await adressePhoto(id, entree.recette.photos.plat);
-  if (!adresse) return;
-  const image = new Image();
-  image.src = adresse;
-  await image.decode();
+  if (adresse) await decoderImage(adresse);
 }
 
 function activerFeuilletage(article, id) {
@@ -1117,6 +1182,7 @@ async function vueLivre(idLivre) {
     nomFige.textContent = titre;
     const publication = [livre.editeur, livre.annee].filter(Boolean).join(", ");
     // La couverture est un bouton : un appui l'ouvre en grand (visionneuse plein écran, zoom possible).
+    if (idLivre) await attendreCouvertures([idLivre]);
     const couverture = idLivre ? couvertureLivre(idLivre, titre) : couvertureCarnet();
     const agrandir = el("button", {
       type: "button", class: "livre__agrandir", "aria-label": `Agrandir la couverture : ${titre}`,
