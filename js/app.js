@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.26.0";
+const VERSION = "0.27.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -90,6 +90,7 @@ const ICONES = {
   retour: ["M15 5l-7 7 7 7"],
   partager: ["M12 3v12M7 8l5-5 5 5", "M5 13v6h14v-6"],
   corbeille: ["M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"],
+  fermer: ["M6 6l12 12M18 6 6 18"],
   soleil: ["M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", "M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"],
 };
 
@@ -686,6 +687,147 @@ async function vueRecettes() {
 
 // Un livre : sa couverture, ses informations et ses recettes dans l'ordre des pages.
 // idLivre vide : les recettes qui ne viennent d'aucun livre connu.
+// Visionneuse plein écran (couverture d'un livre) : l'image en grand sur le fond de l'appli.
+// Zoom à deux doigts (jusqu'à ×5), double appui pour zoomer / revenir, glisser pour se déplacer
+// une fois zoomé ; molette sur ordinateur. Fermeture : ✕, touche Échap ou geste retour du téléphone
+// (une étape d'historique est ajoutée, à la même adresse, comme pour l'écran Filtres).
+function ouvrirVisionneuse(source, description) {
+  const image = el("img", { src: source, alt: description, class: "visionneuse__image", draggable: "false" });
+  const boutonFermer = el("button", { type: "button", class: "visionneuse__fermer", "aria-label": "Fermer" }, icone("fermer"));
+  const cadre = el("div", { class: "visionneuse", role: "dialog", "aria-modal": "true", "aria-label": description },
+    image, boutonFermer);
+
+  let echelle = 1;
+  let decalageX = 0;
+  let decalageY = 0;
+  const ECHELLE_MAX = 5;
+  const appliquer = () => {
+    image.style.transform = `translate(${decalageX}px, ${decalageY}px) scale(${echelle})`;
+  };
+  // L'image ne peut pas sortir du cadre : le déplacement est limité à ce qui dépasse.
+  function borner() {
+    if (echelle <= 1) {
+      echelle = 1;
+      decalageX = 0;
+      decalageY = 0;
+      return;
+    }
+    const largeur = (image.offsetWidth * echelle - cadre.clientWidth) / 2;
+    const hauteur = (image.offsetHeight * echelle - cadre.clientHeight) / 2;
+    decalageX = Math.min(Math.max(decalageX, -Math.max(largeur, 0)), Math.max(largeur, 0));
+    decalageY = Math.min(Math.max(decalageY, -Math.max(hauteur, 0)), Math.max(hauteur, 0));
+  }
+  // Zoom autour d'un point de l'écran (doigts, double appui, curseur) : ce point reste sous le doigt.
+  function zoomer(nouvelle, pointX, pointY) {
+    const borne = Math.min(Math.max(nouvelle, 1), ECHELLE_MAX);
+    const zone = cadre.getBoundingClientRect();
+    const versX = pointX - (zone.left + zone.width / 2);
+    const versY = pointY - (zone.top + zone.height / 2);
+    decalageX = versX - ((versX - decalageX) * borne) / echelle;
+    decalageY = versY - ((versY - decalageY) * borne) / echelle;
+    echelle = borne;
+  }
+
+  const pointeurs = new Map();
+  let geste = null;
+  let dernierAppui = { temps: 0, x: 0, y: 0 };
+  const distance = ([a, b]) => Math.hypot(a.x - b.x, a.y - b.y);
+  const centre = ([a, b]) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  function commencerGeste() {
+    const liste = [...pointeurs.values()];
+    geste = liste.length >= 2
+      ? { type: "pincer", distance: distance(liste), centre: centre(liste), echelle, decalageX, decalageY }
+      : liste.length === 1 ? { type: "glisser", x: liste[0].x, y: liste[0].y, decalageX, decalageY, bouge: false } : null;
+  }
+  cadre.addEventListener("pointerdown", (evenement) => {
+    if (evenement.target.closest(".visionneuse__fermer")) return;
+    try {
+      cadre.setPointerCapture(evenement.pointerId); // le geste continue même si le doigt sort de l'image
+    } catch {
+      // Pointeur déjà relâché : le geste se poursuit sans capture.
+    }
+    pointeurs.set(evenement.pointerId, { x: evenement.clientX, y: evenement.clientY });
+    image.classList.add("visionneuse__image--geste");
+    commencerGeste();
+  });
+  cadre.addEventListener("pointermove", (evenement) => {
+    if (!pointeurs.has(evenement.pointerId) || !geste) return;
+    pointeurs.set(evenement.pointerId, { x: evenement.clientX, y: evenement.clientY });
+    const liste = [...pointeurs.values()];
+    if (geste.type === "pincer" && liste.length >= 2) {
+      echelle = geste.echelle;
+      decalageX = geste.decalageX;
+      decalageY = geste.decalageY;
+      const point = centre(liste);
+      zoomer(geste.echelle * (distance(liste) / geste.distance), geste.centre.x, geste.centre.y);
+      decalageX += point.x - geste.centre.x;
+      decalageY += point.y - geste.centre.y;
+    } else if (geste.type === "glisser") {
+      const dx = evenement.clientX - geste.x;
+      const dy = evenement.clientY - geste.y;
+      if (Math.hypot(dx, dy) > 6) geste.bouge = true;
+      if (echelle > 1) {
+        decalageX = geste.decalageX + dx;
+        decalageY = geste.decalageY + dy;
+      }
+    }
+    appliquer();
+  });
+  function finirPointeur(evenement) {
+    if (!pointeurs.has(evenement.pointerId)) return;
+    const simpleAppui = geste?.type === "glisser" && !geste.bouge && pointeurs.size === 1;
+    pointeurs.delete(evenement.pointerId);
+    // Double appui : zoom ×2,5 à cet endroit, ou retour à la taille normale.
+    if (simpleAppui && evenement.type === "pointerup") {
+      const maintenant = Date.now();
+      if (maintenant - dernierAppui.temps < 300
+        && Math.hypot(evenement.clientX - dernierAppui.x, evenement.clientY - dernierAppui.y) < 30) {
+        zoomer(echelle > 1 ? 1 : 2.5, evenement.clientX, evenement.clientY);
+        dernierAppui = { temps: 0, x: 0, y: 0 };
+      } else {
+        dernierAppui = { temps: maintenant, x: evenement.clientX, y: evenement.clientY };
+      }
+    }
+    if (!pointeurs.size) image.classList.remove("visionneuse__image--geste");
+    borner();
+    appliquer();
+    commencerGeste();
+  }
+  cadre.addEventListener("pointerup", finirPointeur);
+  cadre.addEventListener("pointercancel", finirPointeur);
+  // Molette (ordinateur) : zoom autour du curseur.
+  cadre.addEventListener("wheel", (evenement) => {
+    evenement.preventDefault();
+    zoomer(echelle * Math.exp(-evenement.deltaY / 300), evenement.clientX, evenement.clientY);
+    borner();
+    appliquer();
+  }, { passive: false });
+
+  function retirer() {
+    window.removeEventListener("popstate", surRetour);
+    document.removeEventListener("keydown", surTouche);
+    document.body.classList.remove("visionneuse-ouverte");
+    cadre.remove();
+  }
+  function surRetour() {
+    retirer();
+  }
+  function fermer() {
+    retirer();
+    if (history.state?.visionneuse) history.back();
+  }
+  function surTouche(evenement) {
+    if (evenement.key === "Escape") fermer();
+  }
+  boutonFermer.addEventListener("click", fermer);
+  history.pushState({ ...history.state, visionneuse: true }, "");
+  window.addEventListener("popstate", surRetour);
+  document.addEventListener("keydown", surTouche);
+  document.body.classList.add("visionneuse-ouverte");
+  document.body.append(cadre);
+  boutonFermer.focus();
+}
+
 async function vueLivre(idLivre) {
   const contenu = el("div");
   // En-tête figé compact : retour et titre du livre ; la couverture défile avec la liste.
@@ -706,9 +848,18 @@ async function vueLivre(idLivre) {
     }
     nomFige.textContent = titre;
     const publication = [livre.editeur, livre.annee].filter(Boolean).join(", ");
+    // La couverture est un bouton : un appui l'ouvre en grand (visionneuse plein écran, zoom possible).
+    const couverture = idLivre ? couvertureLivre(idLivre, titre) : couvertureCarnet();
+    const agrandir = el("button", {
+      type: "button", class: "livre__agrandir", "aria-label": `Agrandir la couverture : ${titre}`,
+      onclick: () => {
+        const image = couverture.querySelector("img");
+        if (image) ouvrirVisionneuse(image.src, image.alt);
+      },
+    }, couverture);
     contenu.replaceChildren(
       el("div", { class: "livre" },
-        idLivre ? couvertureLivre(idLivre, titre) : couvertureCarnet(),
+        agrandir,
         el("div", { class: "livre__infos" },
           el("h2", {}, titre),
           livre.sousTitre && el("p", {}, livre.sousTitre),
