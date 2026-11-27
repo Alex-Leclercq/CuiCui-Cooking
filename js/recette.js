@@ -41,15 +41,17 @@ export const CATEGORIES = {
 // Livre fictif qui rassemble les recettes sans livre (sites, recettes perso…).
 export const TITRE_CARNET = "Le carnet de CuiCui";
 
-// Critères proposés pour classer la liste des recettes.
+// Critères proposés pour classer Mes recettes, dans l'ordre des pastilles ; Livre est le classement
+// à l'ouverture. La cuisine se choisit dans les Filtres, un chef se retrouve par la recherche
+// (les classements « cuisine » et « chef » restent compris par classerRecettes).
 export const CLASSEMENTS = [
-  { valeur: "nom", libelle: "Nom" },
   { valeur: "livre", libelle: "Livre" },
   { valeur: "categorie", libelle: "Catégorie" },
-  { valeur: "cuisine", libelle: "Cuisine" },
-  { valeur: "chef", libelle: "Chef" },
   { valeur: "statut", libelle: "Statut" },
+  { valeur: "nom", libelle: "Nom" },
 ];
+
+export const CLASSEMENT_PAR_DEFAUT = "livre";
 
 const nomRecette = (entree) => String(entree.recette.nom ?? entree.id);
 const parNom = (a, b) => nomRecette(a).localeCompare(nomRecette(b), "fr");

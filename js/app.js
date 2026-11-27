@@ -6,7 +6,7 @@ import { ouvrirStockage } from "./stockage.js";
 import { creerClientGitHub } from "./github.js";
 import { creerSynchro } from "./synchro.js";
 import {
-  CATEGORIES, CLASSEMENTS, ORDRE_CHOIX_STATUT, STATUT_PAR_DEFAUT, TITRE_CARNET, classerRecettes, formaterDuree, formaterModification,
+  CATEGORIES, CLASSEMENTS, CLASSEMENT_PAR_DEFAUT, ORDRE_CHOIX_STATUT, STATUT_PAR_DEFAUT, TITRE_CARNET, classerRecettes, formaterDuree, formaterModification,
   formaterSource, grouperIngredients, infosStatut, ingredientsPour, lireStatut, majuscule, modifier, nombrePersonnes,
   partiesIngredient, recetteEnTexte, trierParPage, valeurActuelle,
 } from "./recette.js";
@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.32.0";
+const VERSION = "0.33.1";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -302,7 +302,11 @@ function creerSelection(reafficher) {
   const choisies = new Set();
   let dejaDansLaListe = new Set();
   const message = el("p", { class: "message", role: "status" });
-  const boutonSelectionner = el("button", { type: "button", class: "puce puce--action" }, icone("panier"), "Sélectionner");
+  // Dans la rangée « Classer par » de Mes recettes, seule l'icône est affichée (le mot reste lu par
+  // les lecteurs d'écran) ; dans Favoris et À essayer, le mot « Sélectionner » est visible.
+  const boutonSelectionner = el("button", {
+    type: "button", class: "puce puce--action", title: "Sélectionner des recettes pour les courses",
+  }, icone("panier"), el("span", { class: "puce__texte" }, "Sélectionner"));
   const boutonAjouter = el("button", { type: "button", class: "bouton barre-selection__ajouter" });
   const boutonAnnuler = el("button", { type: "button", class: "bouton bouton--secondaire" }, "Annuler");
   const barre = el("div", { class: "barre-selection", hidden: true }, boutonAnnuler, boutonAjouter);
@@ -411,25 +415,9 @@ function etagere(entrees, livres) {
       el("span", { class: "discret" }, nombreRecettes(groupe.entrees.length))))));
 }
 
-// Critère de classement choisi : retenu sur ce téléphone (simple confort, sans importance s'il se perd).
-const CLE_CLASSEMENT = "cuicui.classement";
-
-function lireClassement() {
-  try {
-    const valeur = localStorage.getItem(CLE_CLASSEMENT);
-    return CLASSEMENTS.some((classement) => classement.valeur === valeur) ? valeur : "nom";
-  } catch {
-    return "nom";
-  }
-}
-
-function retenirClassement(valeur) {
-  try {
-    localStorage.setItem(CLE_CLASSEMENT, valeur);
-  } catch {
-    // Stockage indisponible (navigation privée…) : le choix vaut pour cette visite.
-  }
-}
+// Classement de Mes recettes : Livre (l'étagère) à chaque ouverture de l'application ; le choix fait
+// ensuite est gardé tant que l'application est ouverte (aller voir une recette, changer d'onglet).
+let classementEnCours = CLASSEMENT_PAR_DEFAUT;
 
 // Recherche et filtres de Mes recettes : gardés tant que l'application est ouverte (changement d'onglet,
 // retour d'une recette), jamais enregistrés : ils repartent à zéro à la prochaine ouverture.
@@ -464,10 +452,10 @@ async function vueRecettes() {
   const liste = el("div");
   const choix = el("select", { class: "classement__choix", id: "classement" },
     CLASSEMENTS.map((classement) => el("option", { value: classement.valeur }, classement.libelle)));
-  choix.value = lireClassement();
+  choix.value = classementEnCours;
   // Nouveau classement : la liste repart du haut (l'ancienne position n'a plus de sens).
   choix.addEventListener("change", async () => {
-    retenirClassement(choix.value);
+    classementEnCours = choix.value;
     sectionOuverte = null;
     await rafraichir();
     document.getElementById("vue").scrollTop = 0;
