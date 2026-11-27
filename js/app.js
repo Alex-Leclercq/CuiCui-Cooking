@@ -20,7 +20,7 @@ import {
   verifierEnvoi,
 } from "./envoi.js";
 
-const VERSION = "0.33.1";
+const VERSION = "0.34.0";
 const DEPOT_PAR_DEFAUT = { proprietaire: "Alex-Leclercq", depot: "CuiCui-Recettes" };
 
 // Thème : clair par défaut, comme la maquette ; sombre au choix dans les Réglages (retenu sur le téléphone).
@@ -137,14 +137,14 @@ function notifier(texte, type = "info", action = null) {
     document.body.append(bulle);
   }
   const masquer = () => bulle.classList.remove("notification--visible", "notification--action");
-  bulle.replaceChildren(el("span", {}, texte), action && el("button", {
+  bulle.replaceChildren(el("span", {}, texte), action ? el("button", {
     type: "button", class: "notification__action",
     onclick: () => {
       clearTimeout(minuterieNotification);
       masquer();
       action.faire();
     },
-  }, action.libelle));
+  }, action.libelle) : "");
   bulle.className = `notification notification--${type} notification--visible${action ? " notification--action" : ""}`;
   clearTimeout(minuterieNotification);
   minuterieNotification = setTimeout(masquer, action ? 6000 : 3000);
@@ -698,6 +698,134 @@ async function vueRecettes() {
       masquerFiltres();
     },
   };
+}
+
+// ---- Feuilleter les recettes ----
+// Sur une fiche, glisser vers la gauche = recette suivante, vers la droite = précédente, dans l'ordre
+// où les recettes apparaissent dans la liste d'où l'on vient (livre : ordre des pages ; Favoris,
+// À essayer, Catégorie, Statut : section par section, par nom ; Nom : de A à Z ; recherche : les
+// résultats). Les sections repliées comptent aussi. Flèches ← → au clavier.
+// La pile est relevée au moment où l'on touche une carte de recette ; « actuelle » suit la recette
+// affichée, pour qu'une recette ouverte autrement (courses, lien) ne soit pas feuilletée.
+let pileFeuilletage = null; // { ids, livre, actuelle }
+let sensEntree = 0; // +1 : la nouvelle page arrive de la droite ; -1 : de la gauche
+
+document.addEventListener("click", (evenement) => {
+  const carte = evenement.target.closest?.("#vue a.lien-recette");
+  if (!carte) return;
+  if (routeAffichee === "/courses") {
+    pileFeuilletage = null; // depuis la liste de courses : pas de feuilletage
+    return;
+  }
+  const idDe = (lien) => identifiant(lien.getAttribute("href").slice(1), PREFIXE_RECETTE);
+  const ids = [...new Set([...document.querySelectorAll("#vue a.lien-recette")].map(idDe).filter(Boolean))];
+  pileFeuilletage = { ids, livre: !!routeAffichee?.startsWith(PREFIXE_LIVRE), actuelle: idDe(carte) };
+  sensEntree = 0;
+}, true);
+
+const ASTUCE_FEUILLETER = "cuicui.astuceFeuilleter";
+
+function activerFeuilletage(article, id) {
+  const pile = pileFeuilletage;
+  const rang = pile && pile.actuelle === id ? pile.ids.indexOf(id) : -1;
+  if (rang < 0 || pile.ids.length < 2) return () => {};
+
+  // Arrivée de la page : glissée depuis le côté, après un feuilletage.
+  if (sensEntree) article.classList.add(sensEntree > 0 ? "recette--entree-droite" : "recette--entree-gauche");
+  sensEntree = 0;
+
+  // Astuce, une seule fois sur ce téléphone.
+  try {
+    if (!localStorage.getItem(ASTUCE_FEUILLETER)) {
+      localStorage.setItem(ASTUCE_FEUILLETER, "vue");
+      setTimeout(() => notifier("Astuce : glissez vers la gauche ou la droite pour passer d'une recette à l'autre."), 600);
+    }
+  } catch {
+    // Stockage indisponible : pas d'astuce.
+  }
+
+  const message = (sens) => (sens > 0
+    ? (pile.livre ? "Dernière recette du livre" : "Dernière recette de la liste")
+    : (pile.livre ? "Première recette du livre" : "Première recette de la liste"));
+
+  // Bout de la liste : la page résiste puis revient en place, avec un court message.
+  function rebondir(sens) {
+    article.style.transition = "transform 0.16s ease-out";
+    article.style.transform = `translateX(${-sens * 40}px)`;
+    setTimeout(() => {
+      article.style.transform = "";
+    }, 160);
+    notifier(message(sens));
+  }
+
+  // Page suivante (+1) ou précédente (-1) : l'étape d'historique est remplacée, pour que le retour
+  // ramène directement à la liste, sur la dernière recette lue.
+  function tourner(sens) {
+    const cible = pile.ids[rang + sens];
+    if (!cible) {
+      rebondir(sens);
+      return;
+    }
+    pile.actuelle = cible;
+    sensEntree = sens;
+    article.style.transition = "transform 0.14s ease-in, opacity 0.14s ease-in";
+    article.style.transform = `translateX(${-sens * 60}%)`;
+    article.style.opacity = "0";
+    setTimeout(() => {
+      history.replaceState({ ...history.state }, "", `#${PREFIXE_RECETTE}${encodeURIComponent(cible)}`);
+      afficher();
+    }, 140);
+  }
+
+  // Glissement au doigt : ignoré s'il part du bord de l'écran (geste retour du téléphone), d'un champ
+  // de saisie ou d'un menu, et s'il est surtout vertical (défilement de la recette).
+  let depart = null;
+  let horizontal = null;
+  article.addEventListener("touchstart", (evenement) => {
+    const doigt = evenement.touches[0];
+    depart = null;
+    if (evenement.touches.length !== 1 || doigt.clientX < 24 || doigt.clientX > window.innerWidth - 24
+      || evenement.target.closest("textarea, input, select, .menu-statut")) return;
+    depart = { x: doigt.clientX, y: doigt.clientY };
+    horizontal = null;
+    article.style.transition = "none";
+  }, { passive: true });
+  article.addEventListener("touchmove", (evenement) => {
+    if (!depart) return;
+    const dx = evenement.touches[0].clientX - depart.x;
+    const dy = evenement.touches[0].clientY - depart.y;
+    if (horizontal === null) {
+      if (Math.hypot(dx, dy) < 10) return;
+      horizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
+    }
+    if (!horizontal) return;
+    const auBout = !pile.ids[rang + (dx < 0 ? 1 : -1)];
+    article.style.transform = `translateX(${auBout ? dx * 0.3 : dx}px)`;
+  }, { passive: true });
+  const finir = (evenement) => {
+    if (!depart || !horizontal) {
+      depart = null;
+      return;
+    }
+    const dx = (evenement.changedTouches[0]?.clientX ?? depart.x) - depart.x;
+    depart = null;
+    if (Math.abs(dx) > 70) tourner(dx < 0 ? 1 : -1);
+    else {
+      article.style.transition = "transform 0.16s ease-out";
+      article.style.transform = "";
+    }
+  };
+  article.addEventListener("touchend", finir);
+  article.addEventListener("touchcancel", finir);
+
+  const surTouche = (evenement) => {
+    if (document.body.dataset.ecran !== "recette" || evenement.target.closest?.("textarea, input, select")
+      || document.querySelector(".menu-statut, .visionneuse")) return;
+    if (evenement.key === "ArrowRight") tourner(1);
+    if (evenement.key === "ArrowLeft") tourner(-1);
+  };
+  document.addEventListener("keydown", surTouche);
+  return () => document.removeEventListener("keydown", surTouche);
 }
 
 // Menu des statuts, sous la pastille de la fiche recette (comme la maquette) : une pastille colorée
@@ -1288,8 +1416,7 @@ async function vueRecette(id) {
   ongletIngredients.addEventListener("click", () => montrer(false));
   ongletEtapes.addEventListener("click", () => montrer(true));
 
-  return {
-    contenu: el("article", { class: "recette" },
+  const article = el("article", { class: "recette" },
       // Barre figée, posée sur la photo : retour à gauche ; panier, écran allumé et partage à droite.
       enteteFige(el("div", { class: "entete-vue__barre" },
         boutonRetour(),
@@ -1324,8 +1451,14 @@ async function vueRecette(id) {
         el("h3", {}, el("label", { for: "notes-recette" }, "Mes notes")),
         champNotes,
         el("div", { class: "barre-actions" }, boutonNotes),
-        messageNotes))),
-    quitter: ecranAllume.arreter,
+        messageNotes)));
+  const arreterFeuilletage = activerFeuilletage(article, id);
+  return {
+    contenu: article,
+    quitter: () => {
+      ecranAllume.arreter();
+      arreterFeuilletage();
+    },
   };
 }
 
